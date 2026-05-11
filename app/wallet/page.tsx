@@ -8,8 +8,9 @@ import { Copy, ExternalLink, Lock, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { NETWORKS } from "@/lib/networks";
-import { getNativeBalance } from "@/lib/wdk-client";
+import { getNativeBalance, getTokenBalances } from "@/lib/wdk-client";
 import { hasVault } from "@/lib/storage";
+import { getKnownTokens, type SplToken } from "@/lib/tokens";
 import { cn, formatBalance, truncate } from "@/lib/utils";
 import { useWalletStore } from "@/store/wallet";
 
@@ -23,6 +24,8 @@ export default function WalletPage() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [tokenBalances, setTokenBalances] = useState<Record<string, bigint>>({});
+  const knownTokens: SplToken[] = getKnownTokens(network);
 
   // If we lost the in-memory handle (e.g. tab reload after lock), bounce to
   // the unlock screen when an encrypted vault is available on this device,
@@ -37,15 +40,26 @@ export default function WalletPage() {
     if (!handle) return;
     setRefreshing(true);
     try {
-      const lamports = await getNativeBalance(handle);
+      // Run native + token balance fetches in parallel — both rely on the same
+      // RPC connection and short-circuit each other's UX wait if one is slow.
+      const [lamports, tokens] = await Promise.all([
+        getNativeBalance(handle),
+        knownTokens.length > 0
+          ? getTokenBalances(
+              handle,
+              knownTokens.map((t) => t.mint),
+            )
+          : Promise.resolve({} as Record<string, bigint>),
+      ]);
       setBalance(lamports);
+      setTokenBalances(tokens);
     } catch (err) {
       console.error("Failed to fetch balance:", err);
       setBalance(null);
     } finally {
       setRefreshing(false);
     }
-  }, [handle, setBalance]);
+  }, [handle, knownTokens, setBalance]);
 
   // Fetch balance on initial mount once we have a handle.
   useEffect(() => {
@@ -176,6 +190,45 @@ export default function WalletPage() {
             Receive
           </Link>
         </div>
+
+        {/* Token balances */}
+        {knownTokens.length > 0 && (
+          <Card>
+            <CardDescription>Tokens</CardDescription>
+            <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+              {knownTokens.map((token) => {
+                const bal = tokenBalances[token.mint] ?? 0n;
+                return (
+                  <li
+                    key={token.mint}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                        {token.symbol.slice(0, 3)}
+                      </div>
+                      <div className="leading-tight">
+                        <p className="text-sm font-medium">{token.symbol}</p>
+                        <p className="text-xs text-zinc-500">{token.name}</p>
+                      </div>
+                    </div>
+                    <p className="font-mono text-sm">
+                      {formatBalance(bal, token.decimals)}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-3 text-[11px] text-zinc-500">
+              SPL token send is not in this template yet — coming in a follow-up.
+              Edit{" "}
+              <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
+                lib/tokens.ts
+              </code>{" "}
+              to surface additional tokens.
+            </p>
+          </Card>
+        )}
       </div>
     </main>
   );

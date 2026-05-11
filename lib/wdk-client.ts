@@ -137,3 +137,38 @@ function coerceBigInt(v: unknown): bigint {
 export function isLikelySolanaAddress(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value.trim());
 }
+
+/**
+ * Fetch SPL token balances for a list of mints. Returns a map keyed by mint.
+ * Missing balances (no ATA, account not yet created) are returned as 0n.
+ */
+export async function getTokenBalances(
+  handle: WalletHandle,
+  mints: readonly string[],
+): Promise<Record<string, bigint>> {
+  if (mints.length === 0) return {};
+  try {
+    const raw = (await handle.account.getTokenBalances(
+      mints as string[],
+    )) as Record<string, bigint | number | string>;
+    const out: Record<string, bigint> = {};
+    for (const mint of mints) {
+      out[mint] = coerceBigInt(raw?.[mint]);
+    }
+    return out;
+  } catch {
+    // If the underlying RPC chokes on one mint (rare), fall back to per-mint.
+    const out: Record<string, bigint> = {};
+    await Promise.all(
+      mints.map(async (mint) => {
+        try {
+          const v = await handle.account.getTokenBalance(mint);
+          out[mint] = coerceBigInt(v);
+        } catch {
+          out[mint] = 0n;
+        }
+      }),
+    );
+    return out;
+  }
+}
