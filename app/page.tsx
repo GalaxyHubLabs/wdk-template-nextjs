@@ -36,17 +36,54 @@ const buttonStyles =
  * CTA accordingly. SSR always returns the no-vault variant so the
  * server-rendered HTML is safe to cache on a CDN.
  */
-export default function Home() {
-  const [vaultPresent, setVaultPresent] = useState(false);
-  const [copiedSnippet, setCopiedSnippet] = useState(false);
-  useEffect(() => {
-    setVaultPresent(hasVault());
-  }, []);
+type AgentTab = "ts" | "curl" | "claude";
 
-  /** Exact snippet a user pastes into claude_desktop_config.json. The
-   *  URL host is intentionally a placeholder — the agents guide
-   *  explains how to swap it for the live deployment URL. */
-  const mcpSnippet = `{
+/** Tabbed snippets surfaced in the AI-agents strip. The TypeScript one
+ *  shows direct WDK SDK usage — agents driving the wallet through the
+ *  same lib/wdk-client.ts surface the UI uses. curl proves the MCP
+ *  endpoint is real and protocol-standard. Claude Desktop is one
+ *  example client among many. */
+const AGENT_SNIPPETS: Record<
+  AgentTab,
+  { label: string; filename: string; body: string }
+> = {
+  ts: {
+    label: "TypeScript",
+    filename: "agent-send-usdt.ts",
+    body: `import { openWallet, sendToken } from "@/lib/wdk-client";
+import { networkSpec } from "@/lib/chains";
+
+// One seed, every chain — same SDK the wallet UI uses.
+const wdk = await openWallet(seed, "mainnet");
+
+const usdt = networkSpec("polygon", "mainnet")
+  .tetherTokens.find(t => t.symbol === "USDT")!;
+
+await sendToken(wdk, "polygon", usdt.address, recipient, 100_000_000n);`,
+  },
+  curl: {
+    label: "curl",
+    filename: "probe.sh",
+    body: `# Live JSON-RPC over HTTP — no SDK, no vendor lock-in.
+curl -X POST https://your-domain/api/mcp \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_balance",
+      "arguments": {
+        "chain": "polygon",
+        "address": "0xabc...def"
+      }
+    }
+  }'`,
+  },
+  claude: {
+    label: "Claude Desktop",
+    filename: "claude_desktop_config.json",
+    body: `{
   "mcpServers": {
     "wdk-wallet": {
       "transport": {
@@ -55,11 +92,23 @@ export default function Home() {
       }
     }
   }
-}`;
+}`,
+  },
+};
+
+export default function Home() {
+  const [vaultPresent, setVaultPresent] = useState(false);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [agentTab, setAgentTab] = useState<AgentTab>("ts");
+  useEffect(() => {
+    setVaultPresent(hasVault());
+  }, []);
+
+  const activeSnippet = AGENT_SNIPPETS[agentTab];
 
   async function copyMcpSnippet() {
     try {
-      await navigator.clipboard.writeText(mcpSnippet);
+      await navigator.clipboard.writeText(activeSnippet.body);
       setCopiedSnippet(true);
       setTimeout(() => setCopiedSnippet(false), 1800);
     } catch {
@@ -261,12 +310,16 @@ export default function Home() {
               </div>
 
               <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-                Drive this wallet from{" "}
-                <span className="text-brand">Claude</span> in five lines of
-                config.
+                Your <span className="text-brand">WDK</span> wallet,
+                programmable from any AI agent.
               </h2>
               <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                The template ships a built-in{" "}
+                The same{" "}
+                <code className="rounded bg-white px-1.5 py-0.5 text-[12px] dark:bg-zinc-950">
+                  @tetherto/wdk
+                </code>{" "}
+                integration that powers the wallet UI is exposed to AI
+                agents through an open{" "}
                 <a
                   href="https://modelcontextprotocol.io"
                   target="_blank"
@@ -275,14 +328,8 @@ export default function Home() {
                 >
                   Model Context Protocol
                 </a>{" "}
-                server. Every tool reads through the same{" "}
-                <code className="rounded bg-white px-1.5 py-0.5 text-[12px] dark:bg-zinc-950">
-                  @tetherto/wdk
-                </code>{" "}
-                integration that powers the wallet UI — agents see the
-                exact same chain config, the exact same RPCs, the exact
-                same address resolution. Zero glue code. Zero seed
-                exposure.
+                server. Same chains, same RPCs, same address resolution.
+                Zero glue code, zero seed exposure.
               </p>
 
               {/* The six tools the MCP server exposes. Compact chip strip
@@ -306,6 +353,13 @@ export default function Home() {
                 ))}
               </div>
 
+              {/* Compatibility note — MCP is an open protocol; the strip
+                  shouldn't read as "we built this for Claude". */}
+              <p className="text-xs text-zinc-500">
+                Compatible with any MCP client — Claude Desktop, Cursor,
+                Continue, Cline, Windsurf, or your own runtime.
+              </p>
+
               <Link
                 href="/agents"
                 className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-all hover:opacity-90"
@@ -315,9 +369,10 @@ export default function Home() {
             </div>
 
             <div className="flex items-center">
-              {/* Faux terminal preview of the Claude Desktop config snippet.
-                  We render the JSON literally so a reviewer can see the exact
-                  shape they'll paste into their config file. */}
+              {/* Tabbed faux terminal — the same /api/mcp endpoint reached
+                  three different ways. The TypeScript tab is the default
+                  because it shows direct @tetherto/wdk usage, making the
+                  WDK-first framing concrete at first glance. */}
               <div className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-950 shadow-lg dark:border-zinc-800">
                 <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
                   <div className="flex items-center gap-1.5">
@@ -327,7 +382,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] text-zinc-500">
-                      claude_desktop_config.json
+                      {activeSnippet.filename}
                     </span>
                     <button
                       type="button"
@@ -348,38 +403,36 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
-                <pre className="overflow-x-auto p-4 font-mono text-[11px] leading-relaxed text-zinc-300">
-                  <code>
-                    <span className="text-zinc-500">{"{"}</span>
-                    {"\n  "}
-                    <span className="text-emerald-300">&quot;mcpServers&quot;</span>
-                    <span className="text-zinc-500">: {"{"}</span>
-                    {"\n    "}
-                    <span className="text-emerald-300">&quot;wdk-wallet&quot;</span>
-                    <span className="text-zinc-500">: {"{"}</span>
-                    {"\n      "}
-                    <span className="text-emerald-300">&quot;transport&quot;</span>
-                    <span className="text-zinc-500">: {"{"}</span>
-                    {"\n        "}
-                    <span className="text-emerald-300">&quot;type&quot;</span>
-                    <span className="text-zinc-500">: </span>
-                    <span className="text-amber-200">&quot;http&quot;</span>
-                    <span className="text-zinc-500">,</span>
-                    {"\n        "}
-                    <span className="text-emerald-300">&quot;url&quot;</span>
-                    <span className="text-zinc-500">: </span>
-                    <span className="text-amber-200">
-                      &quot;https://your-domain/api/mcp&quot;
-                    </span>
-                    {"\n      "}
-                    <span className="text-zinc-500">{"}"}</span>
-                    {"\n    "}
-                    <span className="text-zinc-500">{"}"}</span>
-                    {"\n  "}
-                    <span className="text-zinc-500">{"}"}</span>
-                    {"\n"}
-                    <span className="text-zinc-500">{"}"}</span>
-                  </code>
+
+                {/* Tab strip */}
+                <div className="flex border-b border-zinc-800 bg-zinc-900/60">
+                  {(Object.entries(AGENT_SNIPPETS) as Array<
+                    [AgentTab, (typeof AGENT_SNIPPETS)[AgentTab]]
+                  >).map(([key, tab]) => {
+                    const active = agentTab === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setAgentTab(key);
+                          setCopiedSnippet(false);
+                        }}
+                        className={cn(
+                          "border-b-2 px-3 py-1.5 font-mono text-[10px] font-medium transition-colors",
+                          active
+                            ? "border-brand text-brand"
+                            : "border-transparent text-zinc-500 hover:text-zinc-300",
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <pre className="max-h-[280px] overflow-auto p-4 font-mono text-[11px] leading-relaxed text-zinc-300">
+                  <code>{activeSnippet.body}</code>
                 </pre>
               </div>
             </div>
