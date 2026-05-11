@@ -38,7 +38,7 @@ export default function UnlockPage() {
     setStatus("loading");
     try {
       const seed = await unlockVault(password);
-      const handle = await openWallet(seed, "devnet");
+      const handle = await openWallet(seed);
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");

@@ -59,7 +59,7 @@ export default function CreateWalletPage() {
     setStatus("loading");
     try {
       await saveVault(seedPhrase, password);
-      const handle = await openWallet(seedPhrase, "devnet");
+      const handle = await openWallet(seedPhrase);
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");

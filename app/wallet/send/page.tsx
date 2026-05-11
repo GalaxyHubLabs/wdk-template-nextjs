@@ -2,17 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, Send } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  ExternalLink,
+  Send,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { NETWORKS } from "@/lib/networks";
+import { CHAIN_CONFIGS } from "@/lib/chains";
 import { hasVault } from "@/lib/storage";
 import { cn, formatBalance, truncate } from "@/lib/utils";
 import {
-  isLikelySolanaAddress,
+  isLikelyAddressFor,
   quoteNativeSend,
   sendNative,
   type SendQuote,
@@ -21,17 +27,16 @@ import { useWalletStore } from "@/store/wallet";
 
 type Step = "form" | "review" | "sending" | "success";
 
-const LAMPORTS_PER_SOL = 1_000_000_000n;
-
-function parseSolAmount(input: string): bigint | null {
+/** Convert a "1.234" style human input into a chain-native bigint amount. */
+function parseAmount(input: string, decimals: number): bigint | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const [whole, frac = ""] = trimmed.split(".");
-  if (frac.length > 9) return null; // too many decimals for lamports
-  const padded = (frac + "000000000").slice(0, 9);
+  if (frac.length > decimals) return null;
+  const padded = (frac + "0".repeat(decimals)).slice(0, decimals);
   try {
-    return BigInt(whole) * LAMPORTS_PER_SOL + BigInt(padded);
+    return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(padded || "0");
   } catch {
     return null;
   }
@@ -40,9 +45,9 @@ function parseSolAmount(input: string): bigint | null {
 export default function SendPage() {
   const router = useRouter();
   const handle = useWalletStore((s) => s.handle);
-  const network = useWalletStore((s) => s.network);
-  const balance = useWalletStore((s) => s.balance);
-  const setBalance = useWalletStore((s) => s.setBalance);
+  const activeChain = useWalletStore((s) => s.activeChain);
+  const nativeBalances = useWalletStore((s) => s.nativeBalances);
+  const setNativeBalance = useWalletStore((s) => s.setNativeBalance);
 
   const [step, setStep] = useState<Step>("form");
   const [recipient, setRecipient] = useState("");
@@ -58,7 +63,35 @@ export default function SendPage() {
     }
   }, [handle, router]);
 
-  if (!handle) {
+  // Reset the form whenever the user toggles between chains via the wallet
+  // page — quotes from one chain are meaningless on another.
+  useEffect(() => {
+    setStep("form");
+    setRecipient("");
+    setAmount("");
+    setQuote(null);
+    setError(null);
+  }, [activeChain]);
+
+  const activeAccount = handle?.accounts[activeChain];
+  const config = CHAIN_CONFIGS[activeChain];
+
+  const amountUnits = useMemo(
+    () => parseAmount(amount, config.nativeDecimals),
+    [amount, config.nativeDecimals],
+  );
+  const balance = nativeBalances[activeChain] ?? 0n;
+  const totalIfSending =
+    amountUnits != null && quote != null ? amountUnits + quote.fee : null;
+  const insufficientFunds = totalIfSending != null && totalIfSending > balance;
+
+  const canReview =
+    isLikelyAddressFor(activeChain, recipient) &&
+    amountUnits != null &&
+    amountUnits > 0n &&
+    amountUnits <= balance;
+
+  if (!handle || !activeAccount) {
     return (
       <main className="flex flex-1 items-center justify-center px-6">
         <p className="text-sm text-zinc-500">Redirecting…</p>
@@ -66,53 +99,43 @@ export default function SendPage() {
     );
   }
 
-  const networkCfg = NETWORKS[network];
-  const amountLamports = parseSolAmount(amount);
-  const balanceLamports = balance ?? 0n;
-  const totalIfSending =
-    amountLamports != null && quote != null ? amountLamports + quote.fee : null;
-  const insufficientFunds =
-    totalIfSending != null && totalIfSending > balanceLamports;
-
-  const canReview =
-    isLikelySolanaAddress(recipient) &&
-    amountLamports != null &&
-    amountLamports > 0n &&
-    amountLamports <= balanceLamports;
-
   async function handleReview() {
-    if (!canReview || !handle || amountLamports == null) return;
+    if (!canReview || !handle || amountUnits == null) return;
     setError(null);
     setBusy(true);
     try {
-      const q = await quoteNativeSend(handle, recipient.trim(), amountLamports);
+      const q = await quoteNativeSend(
+        handle,
+        activeChain,
+        recipient.trim(),
+        amountUnits,
+      );
       setQuote(q);
       setStep("review");
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to estimate fee.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Failed to estimate fee.");
     } finally {
       setBusy(false);
     }
   }
 
   async function handleSend() {
-    if (!handle || amountLamports == null) return;
+    if (!handle || amountUnits == null) return;
     setError(null);
     setBusy(true);
     setStep("sending");
     try {
-      const result = await sendNative(handle, recipient.trim(), amountLamports);
+      const result = await sendNative(
+        handle,
+        activeChain,
+        recipient.trim(),
+        amountUnits,
+      );
       setSignature(result.signature);
       setStep("success");
-      // Optimistic balance update: subtract sent + fee. Real value will be
-      // re-fetched when the user returns to /wallet.
-      setBalance(balanceLamports - amountLamports - result.fee);
+      setNativeBalance(activeChain, balance - amountUnits - result.fee);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Transaction failed.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Transaction failed.");
       setStep("review");
     } finally {
       setBusy(false);
@@ -133,13 +156,15 @@ export default function SendPage() {
         </Button>
 
         <header className="space-y-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">Send SOL</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Send {config.nativeSymbol}
+          </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Sending on{" "}
-            <span className="font-medium text-foreground">{networkCfg.label}</span>
-            {" · "}Balance{" "}
+            <span className="font-medium text-foreground">{config.label}</span>
+            {config.isTestnet ? " testnet" : ""} · Balance{" "}
             <span className="font-mono font-medium text-foreground">
-              {formatBalance(balanceLamports, 9)} SOL
+              {formatBalance(balance, config.nativeDecimals)} {config.nativeSymbol}
             </span>
           </p>
         </header>
@@ -148,7 +173,8 @@ export default function SendPage() {
           <Card>
             <CardTitle>Recipient & amount</CardTitle>
             <CardDescription className="mt-1 mb-4">
-              Double-check the address — Solana transactions are irreversible.
+              Double-check the address — {config.label} transactions are
+              irreversible.
             </CardDescription>
 
             <div className="space-y-4">
@@ -160,20 +186,20 @@ export default function SendPage() {
                   id="recipient"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="Solana address (base58)"
+                  placeholder={`${config.label} address`}
                   autoComplete="off"
                   spellCheck={false}
                 />
-                {recipient && !isLikelySolanaAddress(recipient) && (
+                {recipient && !isLikelyAddressFor(activeChain, recipient) && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Doesn&apos;t look like a Solana address.
+                    Doesn&apos;t look like a {config.label} address.
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="amount">
-                  Amount (SOL)
+                  Amount ({config.nativeSymbol})
                 </label>
                 <Input
                   id="amount"
@@ -182,7 +208,7 @@ export default function SendPage() {
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
                 />
-                {amountLamports != null && amountLamports > balanceLamports && (
+                {amountUnits != null && amountUnits > balance && (
                   <p className="text-xs text-red-600 dark:text-red-400">
                     Amount exceeds available balance.
                   </p>
@@ -208,7 +234,7 @@ export default function SendPage() {
           </Card>
         )}
 
-        {step === "review" && quote && amountLamports != null && (
+        {step === "review" && quote && amountUnits != null && (
           <Card>
             <CardTitle>Review</CardTitle>
             <CardDescription className="mt-1 mb-4">
@@ -216,12 +242,24 @@ export default function SendPage() {
             </CardDescription>
 
             <dl className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              <Row label="To" value={<span className="font-mono">{truncate(recipient.trim(), 8, 8)}</span>} />
+              <Row
+                label="Chain"
+                value={
+                  <span className="font-medium">
+                    {config.label}
+                    {config.isTestnet ? " (testnet)" : ""}
+                  </span>
+                }
+              />
+              <Row
+                label="To"
+                value={<span className="font-mono">{truncate(recipient.trim(), 8, 8)}</span>}
+              />
               <Row
                 label="Amount"
                 value={
                   <span className="font-mono">
-                    {formatBalance(amountLamports, 9)} SOL
+                    {formatBalance(amountUnits, config.nativeDecimals)} {config.nativeSymbol}
                   </span>
                 }
               />
@@ -229,7 +267,9 @@ export default function SendPage() {
                 label="Network fee"
                 value={
                   <span className="font-mono">
-                    {formatBalance(quote.fee, 9)} SOL
+                    {quote.fee === 0n
+                      ? "—"
+                      : `${formatBalance(quote.fee, config.nativeDecimals)} ${config.nativeSymbol}`}
                   </span>
                 }
               />
@@ -237,7 +277,7 @@ export default function SendPage() {
                 label="Total"
                 value={
                   <span className="font-mono font-medium text-foreground">
-                    {formatBalance(amountLamports + quote.fee, 9)} SOL
+                    {formatBalance(amountUnits + quote.fee, config.nativeDecimals)} {config.nativeSymbol}
                   </span>
                 }
               />
@@ -292,7 +332,7 @@ export default function SendPage() {
           <Card className="flex flex-col items-center gap-4 py-10 text-center">
             <span className="inline-block h-10 w-10 animate-spin rounded-full border-2 border-current border-r-transparent text-zinc-500" />
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Submitting transaction to {networkCfg.label}…
+              Submitting transaction to {config.label}…
             </p>
           </Card>
         )}
@@ -304,12 +344,12 @@ export default function SendPage() {
             </div>
             <CardTitle>Sent</CardTitle>
             <CardDescription>
-              Transaction submitted. It will finalize on{" "}
-              {networkCfg.label} in a few seconds.
+              Transaction submitted to {config.label}. It will finalize on-chain
+              shortly.
             </CardDescription>
 
             <a
-              href={networkCfg.explorerUrl(signature, "tx")}
+              href={config.txExplorer(signature)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-mono hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"

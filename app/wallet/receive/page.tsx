@@ -7,14 +7,14 @@ import { ArrowLeft, Check, Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { NETWORKS } from "@/lib/networks";
+import { CHAIN_CONFIGS } from "@/lib/chains";
 import { hasVault } from "@/lib/storage";
 import { useWalletStore } from "@/store/wallet";
 
 export default function ReceivePage() {
   const router = useRouter();
   const handle = useWalletStore((s) => s.handle);
-  const network = useWalletStore((s) => s.network);
+  const activeChain = useWalletStore((s) => s.activeChain);
 
   const [copied, setCopied] = useState(false);
 
@@ -24,10 +24,13 @@ export default function ReceivePage() {
     }
   }, [handle, router]);
 
+  const activeAccount = handle?.accounts[activeChain];
+  const config = CHAIN_CONFIGS[activeChain];
+
   async function copyAddress() {
-    if (!handle) return;
+    if (!activeAccount) return;
     try {
-      await navigator.clipboard.writeText(handle.address);
+      await navigator.clipboard.writeText(activeAccount.address);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -35,15 +38,13 @@ export default function ReceivePage() {
     }
   }
 
-  if (!handle) {
+  if (!handle || !activeAccount) {
     return (
       <main className="flex flex-1 items-center justify-center px-6">
         <p className="text-sm text-zinc-500">Redirecting…</p>
       </main>
     );
   }
-
-  const networkCfg = NETWORKS[network];
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -61,14 +62,15 @@ export default function ReceivePage() {
           <h1 className="text-3xl font-semibold tracking-tight">Receive</h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Scan the QR or copy the address below to receive on{" "}
-            <span className="font-medium text-foreground">{networkCfg.label}</span>.
+            <span className="font-medium text-foreground">{config.label}</span>
+            {config.isTestnet ? " testnet." : "."}
           </p>
         </header>
 
         <Card className="flex flex-col items-center gap-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800">
             <QRCodeSVG
-              value={handle.address}
+              value={activeAccount.address}
               size={220}
               level="M"
               marginSize={2}
@@ -77,10 +79,10 @@ export default function ReceivePage() {
           </div>
 
           <div className="w-full space-y-2">
-            <CardDescription>Wallet address</CardDescription>
+            <CardDescription>{config.label} address</CardDescription>
             <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
               <code className="flex-1 break-all text-xs font-mono text-foreground">
-                {handle.address}
+                {activeAccount.address}
               </code>
               <button
                 onClick={copyAddress}
@@ -96,9 +98,12 @@ export default function ReceivePage() {
             </div>
           </div>
 
-          <CardDescription className="text-center text-xs">
-            Only send Solana ({networkCfg.label}) assets to this address.
-            Sending tokens from other chains will result in permanent loss.
+          <CardTitle className="text-base text-amber-700 dark:text-amber-400">
+            Only send {config.label} assets.
+          </CardTitle>
+          <CardDescription className="text-center text-xs -mt-3">
+            Sending tokens from other chains to this address will result in
+            permanent loss.
           </CardDescription>
         </Card>
       </div>

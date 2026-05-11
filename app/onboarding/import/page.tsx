@@ -105,7 +105,7 @@ export default function ImportWalletPage() {
     setStatus("loading");
     try {
       await saveVault(phrase, password);
-      const handle = await openWallet(phrase, "devnet");
+      const handle = await openWallet(phrase);
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");
