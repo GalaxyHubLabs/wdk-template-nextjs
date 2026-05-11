@@ -140,7 +140,7 @@ export default function Home() {
 
           <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-6xl">
             One seed.{" "}
-            <span className="text-brand">Nine chains.</span>{" "}
+            <span className="text-brand">Ten chains.</span>{" "}
             USDT-first.
           </h1>
 
@@ -250,7 +250,7 @@ export default function Home() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <FeatureCard
               visual={<NineChainsVisual />}
-              title="Nine chains from one seed"
+              title="Ten chains from one seed"
               body="Solana via @tetherto/wdk-wallet-solana, TRON and TON via their own modules, plus five EVM chains sharing a single WalletManagerEvm with per-chain RPCs."
             />
             <FeatureCard
@@ -272,7 +272,7 @@ export default function Home() {
             <FeatureCard
               visual={<WatchVisual />}
               title="Watch any address"
-              body="Read-only tracking across all nine chains via raw RPC, no keys required. Perfect for portfolio dashboards and treasury views."
+              body="Read-only tracking across all ten chains via raw RPC, no keys required. Perfect for portfolio dashboards and treasury views."
             />
             <FeatureCard
               visual={<NetworksVisual />}
@@ -715,7 +715,7 @@ function NetworksVisual() {
         </span>
       </div>
       <div className="ml-1 flex flex-col font-mono text-[10px] leading-tight text-zinc-500">
-        <span className="text-foreground">9 chains</span>
+        <span className="text-foreground">10 chains</span>
         <span>1 toggle</span>
       </div>
     </div>

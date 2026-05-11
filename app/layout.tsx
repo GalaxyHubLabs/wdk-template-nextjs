@@ -52,14 +52,14 @@ export const metadata: Metadata = {
     type: "website",
     title: "WDK Template Wallet — multi-chain, USDT-first",
     description:
-      "One seed, nine chains. Open-source Next.js template built on Tether's Wallet Development Kit. Solana · TRON · TON · Ethereum · BSC · Polygon · Arbitrum · Base · Optimism.",
+      "One seed, ten chains. Open-source Next.js template built on Tether's Wallet Development Kit. Solana · TRON · TON · Ethereum · BSC · Polygon · Arbitrum · Base · Optimism · Bitcoin.",
     siteName: "WDK Template Wallet",
   },
   twitter: {
     card: "summary_large_image",
     title: "WDK Template Wallet — multi-chain, USDT-first",
     description:
-      "Open-source Next.js wallet template on Tether WDK. Nine chains from one seed. Designed to be forked.",
+      "Open-source Next.js wallet template on Tether WDK. Ten chains from one seed. Designed to be forked.",
   },
 };
 

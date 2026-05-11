@@ -1,6 +1,6 @@
 # WDK Template Wallet — Next.js
 
-> **One seed. Nine chains. USDT-first.** A self-custodial, multi-chain wallet template built on [Tether's Wallet Development Kit](https://docs.wdk.tether.io). Designed for human users **and AI agents** — every wallet operation that an agent could need is exposed through a clean programmatic surface, plus a built-in [Model Context Protocol](https://modelcontextprotocol.io) server at `/api/mcp`.
+> **One seed. Ten chains. USDT-first.** A self-custodial, multi-chain wallet template built on [Tether's Wallet Development Kit](https://docs.wdk.tether.io). Demonstrates eight official `@tetherto/*` packages working together: wallet modules for Solana, TRON, TON, EVM, and Bitcoin, two protocol modules (Velora swap, USDT0 bridge), and the Bitfinex-backed pricing provider. Designed for human users **and AI agents** — every wallet operation that an agent could need is exposed through a clean programmatic surface, plus a built-in [Model Context Protocol](https://modelcontextprotocol.io) server at `/api/mcp`.
 
 [![Built on Tether WDK](https://img.shields.io/badge/Built%20on-Tether%20WDK-009393?style=flat-square)](https://docs.wdk.tether.io)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org)
@@ -22,7 +22,7 @@ Once deployed, the wallet is also a runnable MCP server: any standards-compliant
 
 A complete, opinionated wallet that demonstrates how far the WDK gets you without writing chain-specific code.
 
-### Multi-chain — nine chains from a single BIP-39 seed
+### Multi-chain — ten chains from a single BIP-39 seed
 
 | Chain | Module | Tether tokens (mainnet) | Native price feed |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ A complete, opinionated wallet that demonstrates how far the WDK gets you withou
 | **Arbitrum** | `@tetherto/wdk-wallet-evm` | USDT | ETH |
 | **Base** | `@tetherto/wdk-wallet-evm` | _none official yet — env override available_ | ETH |
 | **Optimism** | `@tetherto/wdk-wallet-evm` | USDT | ETH |
-| _Bitcoin_ | `@tetherto/wdk-wallet-bitcoin` (pending) | _coming soon_ | _coming soon_ |
+| **Bitcoin** | `@tetherto/wdk-wallet-btc` | — (native only) | BTC |
 
 The same `WalletManagerEvm` is registered under five different chain ids with different RPCs — exactly the pattern the WDK docs recommend for EVM L2s. Adding another L2 is a one-entry change in [`lib/chains.ts`](lib/chains.ts) + one `.registerWallet()` call in [`lib/wdk-client.ts`](lib/wdk-client.ts).
 
@@ -60,7 +60,7 @@ The same `WalletManagerEvm` is registered under five different chain ids with di
 - **BIP-44 account index** — tracked on the `WalletHandle`.
 - **Dynamic account list** — create, rename, delete (UI only — the BIP-44 math always derives the same address for a given index).
 - **`/settings/add-account`** picker with five options: Create new, Import recovery phrase, Watch any address (ready); Connect hardware wallet, Import private key (coming soon).
-- **Watch-only addresses** across all nine chains via raw RPC. Read-only — no keys held, no signing surface.
+- **Watch-only addresses** across all ten chains via raw RPC. Read-only — no keys held, no signing surface.
 
 ### Tokens
 
@@ -90,6 +90,7 @@ The same `WalletManagerEvm` is registered under five different chain ids with di
 ### DeFi
 
 - **Swap tokens** (`/wallet/swap`) — quotes and executes EVM-chain swaps through [`@tetherto/wdk-protocol-swap-velora-evm`](https://www.npmjs.com/package/@tetherto/wdk-protocol-swap-velora-evm), Tether's official WDK module for the Velora (ex-ParaSwap) aggregator. Works on every EVM-family chain the template supports, with a clean "approve once → quote → confirm" flow.
+- **Bridge USDT cross-chain** (`/wallet/bridge`) — moves USDT across EVM chains via [`@tetherto/wdk-protocol-bridge-usdt0-evm`](https://www.npmjs.com/package/@tetherto/wdk-protocol-bridge-usdt0-evm), Tether's WDK module wrapping the USDT0 LayerZero OFT bridge. Pick source and destination, approve once, quote, sign — bridged USDT lands on the destination chain after LayerZero relays.
 
 ### NFTs
 
@@ -99,7 +100,7 @@ The same `WalletManagerEvm` is registered under five different chain ids with di
 
 - Portfolio total in USD on the wallet headline (`$X.XX across N chains · Network`).
 - Per-balance USD value below every amount.
-- CoinGecko free-tier price feed with 60-second in-memory cache. `priceChanges` slice for the 24h delta. Includes `matic-network` for Polygon's native.
+- **Bitfinex-backed price feed** via [`@tetherto/wdk-pricing-provider`](https://www.npmjs.com/package/@tetherto/wdk-pricing-provider) + [`@tetherto/wdk-pricing-bitfinex-http`](https://www.npmjs.com/package/@tetherto/wdk-pricing-bitfinex-http) — Tether's official WDK pricing modules. 60-second in-memory cache, last-good-values fallback on transient failures, 24h change exposed alongside the spot price.
 
 ### Identity and UX
 
@@ -116,7 +117,7 @@ The same `WalletManagerEvm` is registered under five different chain ids with di
 ### Documentation surfaces
 
 - **`/agents`** — in-app walk-through for plugging the wallet's MCP server into any MCP-aware client.
-- **`examples/agent-send-usdt.ts`** — runnable TypeScript script that opens the wallet from a seed in `SEED_PHRASE` env, quotes a USDT transfer, sends it, and prints the explorer link. Works on any of the nine chains by changing one constant.
+- **`examples/agent-send-usdt.ts`** — runnable TypeScript script that opens the wallet from a seed in `SEED_PHRASE` env, quotes a USDT transfer, sends it, and prints the explorer link. Works on any of the ten chains by changing one constant.
 
 ---
 
@@ -362,6 +363,7 @@ app/
   wallet/sign/page.tsx           Arbitrary-message signing
   wallet/approvals/page.tsx      ERC-20 approval explorer + revoker
   wallet/swap/page.tsx           Velora swap (EVM family) via @tetherto/wdk-protocol-swap-velora-evm
+  wallet/bridge/page.tsx         USDT0 cross-chain bridge via @tetherto/wdk-protocol-bridge-usdt0-evm
   wallet/collectibles/page.tsx   Solana NFTs via Metaplex DAS
   wallet/addresses/page.tsx      Address book with ENS / SNS resolution
   wallet/tokens/add/page.tsx     Custom token import + Jupiter auto-fetch (Solana)
@@ -435,7 +437,11 @@ That is it. Every page in the wallet — dashboard, send, receive, history, watc
 - [Next.js 16](https://nextjs.org) (App Router + Turbopack)
 - [TypeScript](https://www.typescriptlang.org) — strict mode, ES2020 target
 - [Tailwind CSS v4](https://tailwindcss.com) — class-based dark variant via `@custom-variant dark`
-- [`@tetherto/wdk`](https://www.npmjs.com/package/@tetherto/wdk) + `@tetherto/wdk-wallet-{solana,tron,ton,evm}`
+- [`@tetherto/wdk`](https://www.npmjs.com/package/@tetherto/wdk) — orchestrator
+- `@tetherto/wdk-wallet-{solana,tron,ton,evm,btc}` — five wallet modules
+- `@tetherto/wdk-protocol-swap-velora-evm` — Velora aggregator
+- `@tetherto/wdk-protocol-bridge-usdt0-evm` — USDT0 LayerZero bridge
+- `@tetherto/wdk-pricing-provider` + `wdk-pricing-bitfinex-http` — Bitfinex price feed
 - [Zustand](https://github.com/pmndrs/zustand) for in-memory state
 - [bip39](https://github.com/bitcoinjs/bip39) for seed-phrase entropy
 - [`qrcode.react`](https://github.com/zpao/qrcode.react) for QR rendering
@@ -448,15 +454,14 @@ That is it. Every page in the wallet — dashboard, send, receive, history, watc
 
 Features the template architecture is ready for but does not yet ship:
 
-- **Other framework variants** — Vue, Svelte, Angular, and Flutter implementations of the same template are on the roadmap.
-- **Bitcoin** support once `@tetherto/wdk-wallet-bitcoin` lands on npm. The "Coming soon" placeholder in the chain selector already points there.
+- **Other framework variants** — Vue, Svelte, Angular, and Flutter implementations of the same template are on the roadmap. (Tether's official UI kit is React Native-only; this template fills the Next.js / Web niche.)
 - **WalletConnect v2** so the template can act as the wallet side of any dApp.
 - **Hardware wallet** signing (Ledger via WebHID).
 - **Private key import** as a fifth account type.
-- **Solana swap** (Jupiter aggregator) — companion to the existing EVM swap which already ships via `@tetherto/wdk-protocol-swap-velora-evm`.
-- **Cross-chain bridge** via `@tetherto/wdk-protocol-bridge-usdt0-evm` — wire the WDK module already published on npm.
+- **Solana swap** (Jupiter aggregator) — companion to the EVM swap shipped via `@tetherto/wdk-protocol-swap-velora-evm`.
 - **Lending positions** via `@tetherto/wdk-protocol-lending-aave-evm` — read + supply / withdraw flows around the Aave protocol module.
 - **Fiat onramp** via `@tetherto/wdk-protocol-fiat-moonpay` — official Tether WDK module for MoonPay.
+- **Account abstraction** via `@tetherto/wdk-wallet-evm-erc-4337` — paymaster / sponsorship paths.
 - **EVM NFT listing** (ERC-721 / ERC-1155 collectibles, mirroring the Solana DAS implementation).
 - **TRC-20 and jetton balances in the watch-only view** (currently link out to the chain explorer).
 

@@ -113,7 +113,7 @@ export default function OpengraphImage() {
               color: "#ffffff",
             }}
           >
-            Nine chains. USDT-first.
+            Ten chains. USDT-first.
           </span>
           <span
             style={{
@@ -123,7 +123,7 @@ export default function OpengraphImage() {
               lineHeight: 1.3,
             }}
           >
-            Solana · TRON · TON · Ethereum · BSC · Polygon · Arbitrum · Base · Optimism
+            Solana · TRON · TON · Ethereum · BSC · Polygon · Arbitrum · Base · Optimism · Bitcoin
           </span>
         </div>
 

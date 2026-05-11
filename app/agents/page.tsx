@@ -175,7 +175,7 @@ export default function AgentsPage() {
               /api/mcp
             </code>
             . Read balances, resolve names, list transactions, and inspect
-            token metadata across all nine chains — zero glue code, zero
+            token metadata across all ten chains — zero glue code, zero
             seed exposure.
           </p>
         </header>
