@@ -429,3 +429,120 @@ export async function getSolanaRecentTransactions(
     return [];
   }
 }
+
+/**
+ * EVM transaction summary — shared shape across Ethereum, BSC, Polygon,
+ * Arbitrum, Base, and Optimism. Etherscan-family APIs return identical
+ * payloads on each chain, so one parser handles them all.
+ */
+export interface EvmTxSummary {
+  hash: string;
+  blockNumber: number;
+  blockTime: number | null;
+  /** Hex address. Lower-cased for display consistency. */
+  from: string;
+  to: string;
+  /** Native value in chain-smallest units (wei). */
+  value: bigint;
+  /** True when the receipt status was 0. */
+  failed: boolean;
+}
+
+/**
+ * Recent native transactions for an EVM-family account.
+ *
+ * Uses each chain's Etherscan-family API. The free endpoint without
+ * an API key tops out around 5 requests/second per IP, which is
+ * plenty for a wallet's "Activity" page. Returns an empty array on
+ * any network error rather than throwing — the UI surfaces "View on
+ * explorer" as a recovery path.
+ */
+export async function getEvmRecentTransactions(
+  handle: WalletHandle,
+  chain: ChainId,
+  limit: number = 15,
+): Promise<EvmTxSummary[]> {
+  const account = handle.accounts[chain];
+  if (!account) return [];
+  const endpoint = etherscanEndpoint(chain, handle.network);
+  if (!endpoint) return [];
+  const url = `${endpoint}?module=account&action=txlist&address=${account.address}&page=1&offset=${limit}&sort=desc`;
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      status?: string;
+      result?: Array<{
+        hash: string;
+        blockNumber: string;
+        timeStamp: string;
+        from: string;
+        to: string;
+        value: string;
+        isError: string;
+        txreceipt_status?: string;
+      }>;
+    };
+    // Etherscan returns status "0" with result === "No transactions found"
+    // for empty accounts — return [] in that case.
+    if (data.status !== "1" || !Array.isArray(data.result)) return [];
+    return data.result.map((tx) => ({
+      hash: tx.hash,
+      blockNumber: Number(tx.blockNumber),
+      blockTime: tx.timeStamp ? Number(tx.timeStamp) : null,
+      from: tx.from.toLowerCase(),
+      to: (tx.to ?? "").toLowerCase(),
+      value: safeBigInt(tx.value),
+      failed: tx.isError === "1" || tx.txreceipt_status === "0",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Map a chain × network pair to its Etherscan-family v2 base URL.
+ *  Returns null for chains where no public scanner API is configured. */
+function etherscanEndpoint(chain: ChainId, network: NetworkKey): string | null {
+  if (network === "mainnet") {
+    switch (chain) {
+      case "evm":
+        return "https://api.etherscan.io/api";
+      case "bsc":
+        return "https://api.bscscan.com/api";
+      case "polygon":
+        return "https://api.polygonscan.com/api";
+      case "arbitrum":
+        return "https://api.arbiscan.io/api";
+      case "base":
+        return "https://api.basescan.org/api";
+      case "optimism":
+        return "https://api-optimistic.etherscan.io/api";
+      default:
+        return null;
+    }
+  }
+  switch (chain) {
+    case "evm":
+      return "https://api-sepolia.etherscan.io/api";
+    case "bsc":
+      return "https://api-testnet.bscscan.com/api";
+    case "polygon":
+      return "https://api-amoy.polygonscan.com/api";
+    case "arbitrum":
+      return "https://api-sepolia.arbiscan.io/api";
+    case "base":
+      return "https://api-sepolia.basescan.org/api";
+    case "optimism":
+      return "https://api-sepolia-optimistic.etherscan.io/api";
+    default:
+      return null;
+  }
+}
+
+function safeBigInt(v: string): bigint {
+  try {
+    return BigInt(v || "0");
+  } catch {
+    return 0n;
+  }
+}
