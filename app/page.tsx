@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ArrowLeftRight,
+  ArrowRight,
+  Bot,
   Eye,
   KeyRound,
   Lock,
@@ -200,6 +202,99 @@ export default function Home() {
               title="Mainnet ↔ Testnet"
               body="A single toggle re-binds every chain to its testnet, with faucet shortcuts on zero-balance accounts. Default is testnet to keep first-run risk-free."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* ─── AI-agents strip ──────────────────────────────────────── */}
+      <section className="px-6 pb-20">
+        <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
+          <div className="grid gap-6 p-8 sm:grid-cols-2 sm:gap-10 sm:p-10">
+            <div className="flex flex-col justify-center space-y-4">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
+                <Bot size={12} /> For AI agents
+              </div>
+              <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+                Drive this wallet from{" "}
+                <span className="text-brand">Claude</span> in five lines of
+                config.
+              </h2>
+              <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                The template ships a built-in{" "}
+                <a
+                  href="https://modelcontextprotocol.io"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-foreground underline underline-offset-4 hover:text-brand"
+                >
+                  Model Context Protocol
+                </a>{" "}
+                server at{" "}
+                <code className="rounded bg-white px-1.5 py-0.5 text-[12px] dark:bg-zinc-950">
+                  /api/mcp
+                </code>
+                . Read balances, resolve <code>.eth</code> / <code>.sol</code>{" "}
+                names, list transactions across nine chains — from any
+                MCP-aware agent. Zero glue code, zero seed exposure.
+              </p>
+              <Link
+                href="/agents"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-all hover:opacity-90"
+              >
+                Read the agent guide <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="flex items-center">
+              {/* Faux terminal preview of the Claude Desktop config snippet.
+                  We render the JSON literally so a reviewer can see the exact
+                  shape they'll paste into their config file. */}
+              <div className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-950 shadow-lg dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+                  </div>
+                  <span className="font-mono text-[10px] text-zinc-500">
+                    claude_desktop_config.json
+                  </span>
+                </div>
+                <pre className="overflow-x-auto p-4 font-mono text-[11px] leading-relaxed text-zinc-300">
+                  <code>
+                    <span className="text-zinc-500">{"{"}</span>
+                    {"\n  "}
+                    <span className="text-emerald-300">&quot;mcpServers&quot;</span>
+                    <span className="text-zinc-500">: {"{"}</span>
+                    {"\n    "}
+                    <span className="text-emerald-300">&quot;wdk-wallet&quot;</span>
+                    <span className="text-zinc-500">: {"{"}</span>
+                    {"\n      "}
+                    <span className="text-emerald-300">&quot;transport&quot;</span>
+                    <span className="text-zinc-500">: {"{"}</span>
+                    {"\n        "}
+                    <span className="text-emerald-300">&quot;type&quot;</span>
+                    <span className="text-zinc-500">: </span>
+                    <span className="text-amber-200">&quot;http&quot;</span>
+                    <span className="text-zinc-500">,</span>
+                    {"\n        "}
+                    <span className="text-emerald-300">&quot;url&quot;</span>
+                    <span className="text-zinc-500">: </span>
+                    <span className="text-amber-200">
+                      &quot;https://your-domain/api/mcp&quot;
+                    </span>
+                    {"\n      "}
+                    <span className="text-zinc-500">{"}"}</span>
+                    {"\n    "}
+                    <span className="text-zinc-500">{"}"}</span>
+                    {"\n  "}
+                    <span className="text-zinc-500">{"}"}</span>
+                    {"\n"}
+                    <span className="text-zinc-500">{"}"}</span>
+                  </code>
+                </pre>
+              </div>
+            </div>
           </div>
         </div>
       </section>
