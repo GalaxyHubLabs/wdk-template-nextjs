@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Copy, ExternalLink, LogOut, RefreshCcw } from "lucide-react";
+import { Copy, ExternalLink, Lock, RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { NETWORKS } from "@/lib/networks";
 import { getNativeBalance } from "@/lib/wdk-client";
-import { clearVault } from "@/lib/storage";
+import { hasVault } from "@/lib/storage";
 import { cn, formatBalance, truncate } from "@/lib/utils";
 import { useWalletStore } from "@/store/wallet";
 
@@ -24,12 +24,12 @@ export default function WalletPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Bounce back to the landing if there's no open wallet handle. This is the
-  // template's session-only behavior — a real production wallet would prompt
-  // for password to decrypt the stored vault instead.
+  // If we lost the in-memory handle (e.g. tab reload after lock), bounce to
+  // the unlock screen when an encrypted vault is available on this device,
+  // or back to the landing otherwise.
   useEffect(() => {
     if (!handle) {
-      router.replace("/");
+      router.replace(hasVault() ? "/unlock" : "/");
     }
   }, [handle, router]);
 
@@ -65,10 +65,12 @@ export default function WalletPage() {
     }
   }
 
-  function logout() {
+  /** Clear the in-memory handle. The encrypted vault stays on this device so
+   * the user can return and unlock with their password. To wipe the vault
+   * entirely, use the "Wipe wallet" affordance on the unlock screen. */
+  function lock() {
     reset();
-    clearVault();
-    router.replace("/");
+    router.replace(hasVault() ? "/unlock" : "/");
   }
 
   if (!handle) {
@@ -94,10 +96,10 @@ export default function WalletPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={logout}
-            aria-label="Log out and clear local data"
+            onClick={lock}
+            aria-label="Lock wallet"
           >
-            <LogOut size={14} /> Log out
+            <Lock size={14} /> Lock
           </Button>
         </div>
 
@@ -155,33 +157,25 @@ export default function WalletPage() {
           </div>
         </Card>
 
-        {/* Actions — Send / Receive coming on day 2 */}
+        {/* Primary actions */}
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/wallet/send"
             className={cn(
-              "flex h-12 items-center justify-center rounded-lg bg-foreground text-background font-medium opacity-50 cursor-not-allowed",
+              "flex h-12 items-center justify-center rounded-lg bg-foreground text-background font-medium transition-all hover:opacity-90 active:opacity-80",
             )}
-            aria-disabled="true"
-            onClick={(e) => e.preventDefault()}
           >
             Send
           </Link>
           <Link
             href="/wallet/receive"
             className={cn(
-              "flex h-12 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900 font-medium dark:bg-zinc-900 dark:text-zinc-100 opacity-50 cursor-not-allowed",
+              "flex h-12 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900 font-medium transition-all hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
             )}
-            aria-disabled="true"
-            onClick={(e) => e.preventDefault()}
           >
             Receive
           </Link>
         </div>
-
-        <p className="text-center text-xs text-zinc-500">
-          Send & Receive flows ship in the next iteration of this template.
-        </p>
       </div>
     </main>
   );

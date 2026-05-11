@@ -2,14 +2,20 @@
  * Password-encrypted seed-phrase storage using the browser WebCrypto API.
  *
  * Threat model:
- * - Seed phrase is encrypted at rest in `sessionStorage` (cleared on tab close).
+ * - Seed phrase is encrypted at rest in `localStorage` (persists across sessions).
  * - Encryption key is derived from the user's password via PBKDF2-SHA256.
- * - Cleartext seed only exists transiently in memory while unlocked.
+ * - Cleartext seed only exists transiently in memory while the wallet is open.
  *
- * This is a template — production wallets should additionally:
+ * Why localStorage instead of sessionStorage:
+ * - Standard wallet UX: open the wallet across tabs/sessions, unlock with password.
+ * - The data is encrypted at rest, so localStorage exposure (XSS) still requires
+ *   guessing the password — and PBKDF2 250K iterations makes brute force expensive.
+ *
+ * Production hardening (left as exercise for the forker):
  * - Use IndexedDB with a non-extractable CryptoKey (WebAuthn / hardware-backed).
  * - Rate-limit unlock attempts.
  * - Add an integrity check / wipe-after-N-failures policy.
+ * - Move vault into a service worker for cross-origin isolation.
  */
 
 const STORAGE_KEY = "wdk-template:vault";
@@ -71,7 +77,7 @@ export interface VaultBlob {
   ct: string; // base64 ciphertext of seedPhrase
 }
 
-/** Encrypt the seed phrase with the user's password and persist to sessionStorage. */
+/** Encrypt the seed phrase with the user's password and persist to localStorage. */
 export async function saveVault(seedPhrase: string, password: string): Promise<void> {
   const subtle = ensureWebCrypto();
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
@@ -88,13 +94,13 @@ export async function saveVault(seedPhrase: string, password: string): Promise<v
     iv: toBase64(iv),
     ct: toBase64(ct),
   };
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(blob));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(blob));
 }
 
 /** Decrypt the stored seed phrase. Throws if no vault or wrong password. */
 export async function unlockVault(password: string): Promise<string> {
-  const raw = sessionStorage.getItem(STORAGE_KEY);
-  if (!raw) throw new Error("No wallet found in this session.");
+  const raw = typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY);
+  if (!raw) throw new Error("No wallet found on this device.");
   const blob = JSON.parse(raw) as VaultBlob;
   if (blob.v !== 1) throw new Error("Unsupported vault format.");
   const subtle = ensureWebCrypto();
@@ -113,10 +119,11 @@ export async function unlockVault(password: string): Promise<string> {
 
 export function hasVault(): boolean {
   if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(STORAGE_KEY) !== null;
+  return localStorage.getItem(STORAGE_KEY) !== null;
 }
 
+/** Erase the encrypted vault completely. Use for "wipe wallet" — destructive. */
 export function clearVault(): void {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY);
 }

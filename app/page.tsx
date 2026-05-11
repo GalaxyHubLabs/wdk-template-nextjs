@@ -1,11 +1,23 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { hasVault } from "@/lib/storage";
 
 const buttonStyles =
   "inline-flex h-14 items-center justify-center rounded-lg px-6 text-lg font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export default function Home() {
+  // Detect on mount whether a vault already exists on this device so we can
+  // surface "Unlock existing" as the primary CTA. SSR returns the no-vault
+  // variant (safe default), and hydration swaps in the right state.
+  const [vaultPresent, setVaultPresent] = useState(false);
+  useEffect(() => {
+    setVaultPresent(hasVault());
+  }, []);
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-xl space-y-12 text-center">
@@ -23,26 +35,63 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
-          <Link
-            href="/onboarding/create"
-            className={cn(
-              buttonStyles,
-              "bg-foreground text-background hover:opacity-90 active:opacity-80 sm:min-w-[200px]",
-            )}
-          >
-            Create new wallet
-          </Link>
-          <Link
-            href="/onboarding/import"
-            className={cn(
-              buttonStyles,
-              "bg-zinc-100 text-zinc-900 hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800 sm:min-w-[200px]",
-            )}
-          >
-            Import existing
-          </Link>
-        </div>
+        {vaultPresent ? (
+          <div className="space-y-3">
+            <Link
+              href="/unlock"
+              className={cn(
+                buttonStyles,
+                "w-full bg-foreground text-background hover:opacity-90 active:opacity-80",
+              )}
+            >
+              Unlock existing wallet
+            </Link>
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
+              <Link
+                href="/onboarding/create"
+                className={cn(
+                  buttonStyles,
+                  "flex-1 bg-zinc-100 text-zinc-900 hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
+                )}
+              >
+                Create new
+              </Link>
+              <Link
+                href="/onboarding/import"
+                className={cn(
+                  buttonStyles,
+                  "flex-1 bg-zinc-100 text-zinc-900 hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
+                )}
+              >
+                Import
+              </Link>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Creating or importing replaces the wallet stored on this device.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href="/onboarding/create"
+              className={cn(
+                buttonStyles,
+                "bg-foreground text-background hover:opacity-90 active:opacity-80 sm:min-w-[200px]",
+              )}
+            >
+              Create new wallet
+            </Link>
+            <Link
+              href="/onboarding/import"
+              className={cn(
+                buttonStyles,
+                "bg-zinc-100 text-zinc-900 hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800 sm:min-w-[200px]",
+              )}
+            >
+              Import existing
+            </Link>
+          </div>
+        )}
 
         <footer className="space-y-2 text-xs text-zinc-500 dark:text-zinc-500">
           <p>
