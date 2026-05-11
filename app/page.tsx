@@ -14,6 +14,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { hasVault } from "@/lib/storage";
+import { CHAIN_CONFIGS, CHAIN_IDS } from "@/lib/chains";
 
 const buttonStyles =
   "inline-flex h-12 items-center justify-center rounded-lg px-6 text-base font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -55,7 +56,7 @@ export default function Home() {
         <div className="mx-auto w-full max-w-3xl space-y-8 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Built on Tether WDK · Featured chain: Solana
+            Built on Tether WDK
           </div>
 
           <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-6xl">
@@ -138,26 +139,28 @@ export default function Home() {
             </div>
           )}
 
-          {/* Chain strip — quick visual proof of the multi-chain claim */}
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 pt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {[
-              "Solana",
-              "TRON",
-              "TON",
-              "Ethereum",
-              "BSC",
-              "Polygon",
-              "Arbitrum",
-              "Base",
-              "Optimism",
-            ].map((c) => (
-              <span
-                key={c}
-                className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                {c}
-              </span>
-            ))}
+          {/* Chain strip — quick visual proof of the multi-chain claim.
+              We show real chain logos rather than text so the proof reads
+              instantly: nine recognisable marks in a single row. */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            {CHAIN_IDS.map((id) => {
+              const c = CHAIN_CONFIGS[id];
+              return (
+                <span
+                  key={id}
+                  title={c.label}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white shadow-sm transition-transform hover:-translate-y-0.5 hover:border-brand/40 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={c.logo}
+                    alt={c.label}
+                    className="h-6 w-6 rounded-full"
+                    loading="lazy"
+                  />
+                </span>
+              );
+            })}
           </div>
         </div>
       </section>
