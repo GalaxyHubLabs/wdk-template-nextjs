@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Copy, ExternalLink, Lock, RefreshCcw } from "lucide-react";
+import { Copy, ExternalLink, Eye, EyeOff, Lock, RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,8 @@ export default function WalletPage() {
   const network = useWalletStore((s) => s.network);
   const balance = useWalletStore((s) => s.balance);
   const setBalance = useWalletStore((s) => s.setBalance);
+  const balanceHidden = useWalletStore((s) => s.balanceHidden);
+  const toggleBalanceHidden = useWalletStore((s) => s.toggleBalanceHidden);
   const reset = useWalletStore((s) => s.reset);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -151,9 +153,23 @@ export default function WalletPage() {
 
           <div className="mt-6 flex items-end justify-between">
             <div>
-              <CardDescription>Balance</CardDescription>
+              <div className="flex items-center gap-2">
+                <CardDescription>Balance</CardDescription>
+                <button
+                  type="button"
+                  onClick={toggleBalanceHidden}
+                  aria-label={balanceHidden ? "Show balances" : "Hide balances"}
+                  className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+                >
+                  {balanceHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
               <p className="mt-1 text-3xl font-semibold tracking-tight">
-                {balance == null ? "—" : formatBalance(balance, 9)}
+                {balanceHidden
+                  ? "••••"
+                  : balance == null
+                    ? "—"
+                    : formatBalance(balance, 9)}
                 <span className="ml-1.5 text-lg font-medium text-zinc-500">
                   SOL
                 </span>
@@ -204,16 +220,26 @@ export default function WalletPage() {
                     className="flex items-center justify-between gap-3 py-3"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                        {token.symbol.slice(0, 3)}
-                      </div>
+                      {token.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={token.logo}
+                          alt={token.symbol}
+                          className="h-9 w-9 rounded-full bg-zinc-100 object-contain p-1 dark:bg-zinc-900"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                          {token.symbol.slice(0, 3)}
+                        </div>
+                      )}
                       <div className="leading-tight">
                         <p className="text-sm font-medium">{token.symbol}</p>
                         <p className="text-xs text-zinc-500">{token.name}</p>
                       </div>
                     </div>
                     <p className="font-mono text-sm">
-                      {formatBalance(bal, token.decimals)}
+                      {balanceHidden ? "••••" : formatBalance(bal, token.decimals)}
                     </p>
                   </li>
                 );

@@ -1,34 +1,94 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { validateMnemonic } from "bip39";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Input, Textarea } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { openWallet } from "@/lib/wdk-client";
 import { saveVault } from "@/lib/storage";
 import { useWalletStore } from "@/store/wallet";
+
+type WordCount = 12 | 24;
 
 export default function ImportWalletPage() {
   const router = useRouter();
   const setHandle = useWalletStore((s) => s.setHandle);
   const setStatus = useWalletStore((s) => s.setStatus);
 
-  const [seedPhrase, setSeedPhrase] = useState("");
+  const [wordCount, setWordCount] = useState<WordCount>(12);
+  const [words, setWords] = useState<string[]>(() => Array.from({ length: 12 }, () => ""));
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+
+  const phrase = useMemo(
+    () => words.map((w) => w.trim().toLowerCase()).join(" ").trim(),
+    [words],
+  );
+  const filledCount = words.filter((w) => w.trim().length > 0).length;
+
+  function setWordCountAndReset(count: WordCount) {
+    setWordCount(count);
+    setWords(Array.from({ length: count }, () => ""));
+    setError(null);
+  }
+
+  function updateWord(index: number, value: string) {
+    setWords((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }
+
+  /** When the user pastes the entire phrase into a single cell, fan it out
+   * into the grid and switch to 24-word mode if needed. */
+  function handlePaste(index: number, e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text").trim();
+    const tokens = text.split(/\s+/).filter(Boolean);
+    if (tokens.length < 2) return; // single word — let the default paste handler run
+
+    e.preventDefault();
+    const targetCount: WordCount = tokens.length >= 24 ? 24 : 12;
+    const filled = Array.from({ length: targetCount }, (_, i) => tokens[i] ?? "");
+    setWordCount(targetCount);
+    setWords(filled);
+    setError(null);
+    // Focus the next empty cell (or last) for ergonomics.
+    setTimeout(() => {
+      const focusAt = Math.min(tokens.length, targetCount - 1);
+      inputsRef.current[focusAt]?.focus();
+    }, 0);
+    void index; // not used directly, kept for clarity if extended
+  }
+
+  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      const next = inputsRef.current[index + 1];
+      if (next) next.focus();
+    } else if (e.key === "Backspace" && words[index] === "" && index > 0) {
+      e.preventDefault();
+      const prev = inputsRef.current[index - 1];
+      prev?.focus();
+    }
+  }
 
   async function handleImport(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const normalized = seedPhrase.trim().toLowerCase().replace(/\s+/g, " ");
-    if (!validateMnemonic(normalized)) {
+    if (filledCount !== wordCount) {
+      setError(`Enter all ${wordCount} words.`);
+      return;
+    }
+    if (!validateMnemonic(phrase)) {
       setError("Invalid recovery phrase. Check the words and try again.");
       return;
     }
@@ -44,8 +104,8 @@ export default function ImportWalletPage() {
     setBusy(true);
     setStatus("loading");
     try {
-      await saveVault(normalized, password);
-      const handle = await openWallet(normalized, "devnet");
+      await saveVault(phrase, password);
+      const handle = await openWallet(phrase, "devnet");
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");
@@ -71,21 +131,64 @@ export default function ImportWalletPage() {
         </header>
 
         <Card>
-          <CardTitle>Recovery phrase</CardTitle>
-          <CardDescription className="mt-1 mb-4">
-            Paste your 12 or 24 word BIP-39 recovery phrase, separated by spaces.
+          <div className="mb-4 flex items-center justify-between">
+            <CardTitle>Recovery phrase</CardTitle>
+            <div className="inline-flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-800">
+              {[12, 24].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setWordCountAndReset(n as WordCount)}
+                  className={
+                    wordCount === n
+                      ? "rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background"
+                      : "rounded-md px-3 py-1 text-xs font-medium text-zinc-500 hover:text-foreground"
+                  }
+                >
+                  {n} words
+                </button>
+              ))}
+            </div>
+          </div>
+          <CardDescription className="mb-4">
+            Type each word in its numbered box, or paste your whole phrase into
+            any cell — it&apos;ll fan out automatically.
           </CardDescription>
 
           <form onSubmit={handleImport} className="space-y-4">
-            <Textarea
-              value={seedPhrase}
-              onChange={(e) => setSeedPhrase(e.target.value)}
-              placeholder="word1 word2 word3 …"
-              autoComplete="off"
-              spellCheck={false}
-              rows={4}
-              required
-            />
+            <div
+              className={`grid gap-2 ${wordCount === 12 ? "grid-cols-3 sm:grid-cols-4" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}
+            >
+              {words.map((word, i) => (
+                <div
+                  key={i}
+                  className="relative flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white pl-2 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <span className="select-none text-xs font-mono text-zinc-400">
+                    {(i + 1).toString().padStart(2, "0")}
+                  </span>
+                  <input
+                    ref={(el) => {
+                      inputsRef.current[i] = el;
+                    }}
+                    type="text"
+                    value={word}
+                    onChange={(e) => updateWord(i, e.target.value)}
+                    onPaste={(e) => handlePaste(i, e)}
+                    onKeyDown={(e) => handleKeyDown(i, e)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    className="h-10 w-full bg-transparent pr-2 text-sm font-mono outline-none placeholder:text-transparent focus:placeholder:text-zinc-400"
+                    placeholder="word"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <p className="text-right text-xs text-zinc-500">
+              {filledCount} / {wordCount} words
+            </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
