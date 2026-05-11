@@ -13,6 +13,15 @@ const nextConfig: NextConfig = {
     resolveAlias: {
       "sodium-native": { browser: "sodium-javascript" },
       "bare-node-runtime": { browser: "next/dist/compiled/util/util.js" },
+      // `@tetherto/wdk-wallet-btc` ships multiple transport options
+      // (Blockbook REST, Electrum WS, Electrum TCP/SSL). The Electrum
+      // TCP path pulls in Node-only `net` / `tls`, but we configure the
+      // wallet with the Blockbook HTTP client which never touches those
+      // modules at runtime. Aliasing them to an empty stub on browser
+      // bundles lets Turbopack tree-shake the TCP transport without
+      // tripping over the static import graph.
+      net: { browser: "./lib/empty-module.js" },
+      tls: { browser: "./lib/empty-module.js" },
     },
   },
   webpack: (config, { isServer }) => {

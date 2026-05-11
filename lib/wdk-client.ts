@@ -90,12 +90,14 @@ export async function openWallet(
     { default: WalletManagerTron },
     { default: WalletManagerTon },
     { default: WalletManagerEvm },
+    { default: WalletManagerBtc },
   ] = await Promise.all([
     import("@tetherto/wdk"),
     import("@tetherto/wdk-wallet-solana"),
     import("@tetherto/wdk-wallet-tron"),
     import("@tetherto/wdk-wallet-ton"),
     import("@tetherto/wdk-wallet-evm"),
+    import("@tetherto/wdk-wallet-btc"),
   ]);
 
   // Each chain manager is a concrete subclass of WDK's abstract WalletManager.
@@ -139,6 +141,23 @@ export async function openWallet(
     })
     .registerWallet("optimism", WalletManagerEvm as any, {
       provider: networkSpec("optimism", network).rpcUrl,
+    })
+    // Bitcoin — different transport layer (Blockbook REST over HTTPS,
+    // CORS-friendly out of the box from Trezor's public nodes) and
+    // different account model (UTXO, no smart contracts, no token
+    // surface). The WDK module abstracts both behind the same
+    // `account.transfer` / `getBalance` contract, so the rest of the
+    // wallet treats it like any other chain.
+    .registerWallet("btc", WalletManagerBtc as any, {
+      network: network === "mainnet" ? "bitcoin" : "testnet",
+      // BIP-84 P2WPKH (native SegWit) — modern default, smaller fees
+      // than legacy P2PKH. Users importing pre-SegWit keys can flip
+      // this to 44 if needed.
+      bip: 84,
+      client: {
+        type: "blockbook",
+        clientConfig: { url: networkSpec("btc", network).rpcUrl },
+      },
     });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -391,6 +410,15 @@ export function isLikelyAddressFor(chain: ChainId, value: string): boolean {
     case "base":
     case "optimism":
       return /^0x[0-9a-fA-F]{40}$/.test(v);
+    case "btc":
+      // Cover the three address families: P2PKH (legacy, starts with
+      // 1 / m / n), P2SH (3 / 2), and bech32 P2WPKH/P2WSH/Taproot
+      // (bc1 / tb1). The regex is permissive on length within each
+      // family — the WDK module's address parser is the final word.
+      return (
+        /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,39}$/.test(v) ||
+        /^(bc1|tb1)[02-9ac-hj-np-z]{8,87}$/i.test(v)
+      );
     default:
       return false;
   }

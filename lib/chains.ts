@@ -22,7 +22,8 @@ export type ChainId =
   | "polygon"
   | "arbitrum"
   | "base"
-  | "optimism";
+  | "optimism"
+  | "btc";
 export type NetworkKey = "mainnet" | "testnet";
 
 export interface TetherToken {
@@ -66,7 +67,8 @@ export interface ChainConfig {
     | "the-open-network"
     | "ethereum"
     | "binancecoin"
-    | "matic-network";
+    | "matic-network"
+    | "bitcoin";
   mainnet: NetworkSpec;
   testnet: NetworkSpec;
 }
@@ -507,6 +509,45 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
       }),
     },
   },
+  btc: {
+    id: "btc",
+    label: "Bitcoin",
+    shortLabel: "BTC",
+    nativeSymbol: "BTC",
+    nativeName: "Bitcoin",
+    // BTC base unit is the satoshi (1 BTC = 1e8 sats).
+    nativeDecimals: 8,
+    logo: `${TRUSTWALLET}/bitcoin/info/logo.png`,
+    nativePriceId: "bitcoin",
+    mainnet: {
+      // Bitcoin doesn't have a JSON-RPC standard like EVM — we point at
+      // a Blockbook REST endpoint (Trezor runs free public nodes) which
+      // the @tetherto/wdk-wallet-btc module consumes via its Blockbook
+      // client transport. The URL is configurable like every other
+      // chain so users can plug in their own indexer in production.
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_BTC_RPC_MAINNET",
+        "https://btc1.trezor.io/api",
+      ),
+      txExplorer: (sig) => `https://mempool.space/tx/${sig}`,
+      addressExplorer: (addr) => `https://mempool.space/address/${addr}`,
+      // Bitcoin has no smart-contract tokens — USDT-on-Bitcoin via
+      // Omni Layer is being deprecated and isn't worth surfacing in a
+      // template. BTC stays native-only here.
+      tetherTokens: [],
+    },
+    testnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_BTC_RPC_TESTNET",
+        "https://btc-tn1.trezor.io/api",
+      ),
+      txExplorer: (sig) => `https://mempool.space/testnet/tx/${sig}`,
+      addressExplorer: (addr) =>
+        `https://mempool.space/testnet/address/${addr}`,
+      faucetUrl: "https://coinfaucet.eu/en/btc-testnet/",
+      tetherTokens: [],
+    },
+  },
 };
 
 export const CHAIN_IDS: readonly ChainId[] = [
@@ -519,6 +560,7 @@ export const CHAIN_IDS: readonly ChainId[] = [
   "arbitrum",
   "base",
   "optimism",
+  "btc",
 ];
 
 export const DEFAULT_CHAIN: ChainId = "solana";
@@ -563,11 +605,4 @@ export const COMING_SOON_CHAINS: Array<{
   shortLabel: string;
   logo: string;
   note: string;
-}> = [
-  {
-    label: "Bitcoin",
-    shortLabel: "BTC",
-    logo: `${TRUSTWALLET}/bitcoin/info/logo.png`,
-    note: "Awaiting @tetherto/wdk-wallet-bitcoin",
-  },
-];
+}> = [];

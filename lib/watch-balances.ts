@@ -44,6 +44,8 @@ export async function fetchNativeBalance(
         return await fetchTronNative(rpcUrl, address);
       case "ton":
         return await fetchTonNative(rpcUrl, address);
+      case "btc":
+        return await fetchBtcNative(rpcUrl, address);
       default:
         return 0n;
     }
@@ -100,6 +102,23 @@ async function fetchTronNative(rpcUrl: string, address: string): Promise<bigint>
   if (!res.ok) return 0n;
   const data = (await res.json()) as { balance?: number };
   return typeof data?.balance === "number" ? BigInt(data.balance) : 0n;
+}
+
+async function fetchBtcNative(rpcUrl: string, address: string): Promise<bigint> {
+  // Blockbook v2 exposes /api/v2/address/<addr> with a balance field
+  // (confirmed sats, base-10 string). The configured rpcUrl already
+  // includes the /api segment, so we just append the v2/address path.
+  const base = rpcUrl.replace(/\/?$/, "");
+  const url = `${base}/v2/address/${encodeURIComponent(address)}?details=basic`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) return 0n;
+  const data = (await res.json()) as { balance?: string };
+  if (typeof data?.balance !== "string") return 0n;
+  try {
+    return BigInt(data.balance);
+  } catch {
+    return 0n;
+  }
 }
 
 async function fetchTonNative(rpcUrl: string, address: string): Promise<bigint> {

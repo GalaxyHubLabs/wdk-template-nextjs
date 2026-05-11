@@ -195,6 +195,8 @@ function placeholderFor(chain: ChainId): string {
     case "base":
     case "optimism":
       return "0xdAC1…831ec7";
+    case "btc":
+      return "bc1q…0wlh";
     default:
       return "Address";
   }
