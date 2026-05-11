@@ -10,6 +10,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { openWallet } from "@/lib/wdk-client";
 import { saveVault } from "@/lib/storage";
+import { resetAccounts } from "@/lib/accounts";
 import { useWalletStore } from "@/store/wallet";
 
 type Step = "password" | "reveal" | "confirm";
@@ -60,6 +61,7 @@ export default function CreateWalletPage() {
     setStatus("loading");
     try {
       await saveVault(seedPhrase, password);
+      resetAccounts();
       const handle = await openWallet(seedPhrase, activeNetwork);
       setHandle(handle);
       setStatus("ready");
