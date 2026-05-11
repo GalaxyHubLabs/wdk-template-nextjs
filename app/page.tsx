@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  Bot,
-  Coins,
+  ArrowLeftRight,
+  Eye,
   KeyRound,
-  Layers,
   Lock,
-  Shield,
+  ShieldCheck,
   Sparkles,
+  Terminal,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -170,32 +170,32 @@ export default function Home() {
         <div className="mx-auto w-full max-w-5xl">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <FeatureCard
-              Icon={Layers}
+              visual={<NineChainsVisual />}
               title="Nine chains from one seed"
-              body="Solana via @tetherto/wdk-wallet-solana, TRON and TON via their own modules, plus five EVM chains (Ethereum, BSC, Polygon, Arbitrum, Base, Optimism) sharing a single WalletManagerEvm with per-chain RPCs."
+              body="Solana via @tetherto/wdk-wallet-solana, TRON and TON via their own modules, plus five EVM chains sharing a single WalletManagerEvm with per-chain RPCs."
             />
             <FeatureCard
-              Icon={Coins}
+              visual={<UsdtVisual />}
               title="USDT-first surface"
-              body="Tether's canonical USDT deployments are first-class on every chain that has one. XAUt surfaces on Ethereum and TRON. Custom tokens get a Jupiter auto-fetch on Solana."
+              body="Tether's canonical USDT deployments are first-class on every chain that has one. XAUt surfaces on Ethereum and TRON."
             />
             <FeatureCard
-              Icon={Shield}
+              visual={<VaultVisual />}
               title="Encrypted local vault"
               body="AES-GCM with 250,000-iteration PBKDF2, all via WebCrypto. The seed never leaves the device — not even to a backend, because there isn't one."
             />
             <FeatureCard
-              Icon={Bot}
+              visual={<AgentVisual />}
               title="AI-agent-ready"
-              body="A clean lib/wdk-client.ts boundary exposes openWallet, send, quote, balances, and account switching. Agents can drive the wallet without touching React."
+              body="A clean lib/wdk-client.ts boundary exposes openWallet, send, quote, balances, and account switching. Agents drive the wallet without touching React."
             />
             <FeatureCard
-              Icon={Sparkles}
+              visual={<WatchVisual />}
               title="Watch any address"
-              body="Read-only tracking across all nine chains via raw RPC, no keys required. Useful for portfolio dashboards and treasury views."
+              body="Read-only tracking across all nine chains via raw RPC, no keys required. Perfect for portfolio dashboards and treasury views."
             />
             <FeatureCard
-              Icon={KeyRound}
+              visual={<NetworksVisual />}
               title="Mainnet ↔ Testnet"
               body="A single toggle re-binds every chain to its testnet, with faucet shortcuts on zero-balance accounts. Default is testnet to keep first-run risk-free."
             />
@@ -231,24 +231,224 @@ export default function Home() {
   );
 }
 
+/**
+ * Feature card. The `visual` slot is a per-feature mini illustration —
+ * stacked chain logos, a code snippet, a price-tag — rather than a
+ * stock icon. This is what separates this landing from the standard
+ * "AI-generated lucide-icon grid" aesthetic: every card communicates
+ * its own idea visually before the body text reinforces it.
+ */
 function FeatureCard({
-  Icon,
+  visual,
   title,
   body,
 }: {
-  Icon: typeof Sparkles;
+  visual: React.ReactNode;
   title: string;
   body: string;
 }) {
   return (
-    <div className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-brand/40 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand">
-        <Icon size={18} />
-      </div>
-      <h3 className="mt-3 text-base font-semibold">{title}</h3>
+    <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="mb-3 h-16">{visual}</div>
+      <h3 className="text-base font-semibold">{title}</h3>
       <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
         {body}
       </p>
+    </div>
+  );
+}
+
+// ─── Per-feature visuals ─────────────────────────────────────────────
+
+/** Stack of real chain logos overlapping diagonally — communicates the
+ *  multi-chain claim visually without us having to spell it out. */
+function NineChainsVisual() {
+  // Pick the 6 most recognisable marks so the stack reads even at 28px.
+  // The wallet supports 9 — the "+3" badge to the right of the stack
+  // makes the rest implicit.
+  const featured: Array<(typeof CHAIN_IDS)[number]> = [
+    "solana",
+    "evm",
+    "tron",
+    "polygon",
+    "arbitrum",
+    "base",
+  ];
+  return (
+    <div className="flex h-16 items-center">
+      <div className="flex">
+        {featured.map((id, i) => {
+          const c = CHAIN_CONFIGS[id];
+          if (!c) return null;
+          return (
+            <span
+              key={id}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-white shadow-sm transition-transform group-hover:[transform:translateY(0)] dark:border-zinc-950 dark:bg-zinc-950"
+              style={{
+                marginLeft: i === 0 ? 0 : -14,
+                zIndex: 10 - i,
+              }}
+              title={c.label}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={c.logo}
+                alt={c.label}
+                className="h-7 w-7 rounded-full"
+                loading="lazy"
+              />
+            </span>
+          );
+        })}
+        <span
+          className="ml-1 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-brand-soft text-xs font-semibold text-brand dark:border-zinc-950"
+          style={{ zIndex: 1 }}
+        >
+          +3
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** USDT (Tether) wordmark mock-up. Uses the same logo we surface on
+ *  every token row so the card reads as "real Tether assets, not a
+ *  stub". XAUt peeks behind it to hint at the gold pair. */
+function UsdtVisual() {
+  return (
+    <div className="flex h-16 items-center gap-3">
+      <div className="relative">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#26a17b] shadow-sm">
+          <span className="font-mono text-base font-bold text-white">₮</span>
+        </span>
+        <span className="absolute -bottom-1 -right-1 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-amber-400 shadow-sm dark:border-zinc-950">
+          <span className="font-mono text-[10px] font-bold text-amber-950">
+            Au
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-col font-mono text-[11px] leading-tight text-zinc-500">
+        <span className="text-foreground">USDT</span>
+        <span>$1.00</span>
+        <span className="text-emerald-600 dark:text-emerald-400">+0.0%</span>
+      </div>
+    </div>
+  );
+}
+
+/** Encrypted vault: shield + lock + cryptography hint as monospace
+ *  characters. Visually anchors the security claim. */
+function VaultVisual() {
+  return (
+    <div className="flex h-16 items-center gap-3">
+      <div className="relative">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-emerald-600 text-white shadow-sm">
+          <ShieldCheck size={22} strokeWidth={2.4} />
+        </span>
+        <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-zinc-900 text-white dark:border-zinc-950">
+          <Lock size={9} strokeWidth={2.8} />
+        </span>
+      </div>
+      <div className="flex flex-col font-mono text-[10px] leading-tight text-zinc-500">
+        <span>AES-256-GCM</span>
+        <span>PBKDF2-SHA256</span>
+        <span className="text-foreground">250k iterations</span>
+      </div>
+    </div>
+  );
+}
+
+/** AI-agent-ready: tiny code snippet shaped like a terminal pane.
+ *  Communicates "this is something a program drives, not just a UI". */
+function AgentVisual() {
+  return (
+    <div className="relative h-16 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 font-mono text-[10px] leading-tight dark:border-zinc-800 dark:bg-zinc-900/60">
+      <div className="flex items-center gap-1 text-zinc-400">
+        <Terminal size={10} />
+        <span>lib/wdk-client.ts</span>
+      </div>
+      <div className="mt-1 text-zinc-700 dark:text-zinc-300">
+        <span className="text-zinc-400">{"> "}</span>
+        <span className="text-brand">await</span>{" "}
+        <span>wdk.send(</span>
+      </div>
+      <div className="pl-3 text-zinc-700 dark:text-zinc-300">
+        {"{ to, amount }"}
+        <span className="text-zinc-400">)</span>
+        <span className="ml-0.5 inline-block h-2.5 w-1.5 translate-y-0.5 animate-pulse bg-brand" />
+      </div>
+    </div>
+  );
+}
+
+/** Watch-only: an eye sitting at the centre of a dotted ring of nine
+ *  small dots — one per supported chain. Reinforces the "all nine
+ *  chains" part of the claim. */
+function WatchVisual() {
+  return (
+    <div className="relative flex h-16 items-center justify-center">
+      <svg
+        viewBox="0 0 128 64"
+        className="h-16 w-32"
+        aria-hidden
+      >
+        {/* Dotted ring */}
+        {Array.from({ length: 9 }).map((_, i) => {
+          const angle = (i / 9) * Math.PI * 2 - Math.PI / 2;
+          const cx = 64 + Math.cos(angle) * 26;
+          const cy = 32 + Math.sin(angle) * 22;
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r={2.4}
+              fill="currentColor"
+              className="text-brand/60"
+            />
+          );
+        })}
+        {/* Centre badge */}
+        <circle
+          cx={64}
+          cy={32}
+          r={14}
+          fill="currentColor"
+          className="text-brand-soft"
+        />
+      </svg>
+      <Eye
+        size={20}
+        strokeWidth={2.2}
+        className="absolute text-brand"
+        aria-hidden
+      />
+    </div>
+  );
+}
+
+/** Mainnet ↔ Testnet: two coloured dots with a double arrow between,
+ *  matching the network indicator pattern used throughout the wallet. */
+function NetworksVisual() {
+  return (
+    <div className="flex h-16 items-center gap-3">
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.55)]" />
+        <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          Main
+        </span>
+      </div>
+      <ArrowLeftRight size={18} className="text-zinc-400" />
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="h-3 w-3 rounded-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.55)]" />
+        <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          Test
+        </span>
+      </div>
+      <div className="ml-1 flex flex-col font-mono text-[10px] leading-tight text-zinc-500">
+        <span className="text-foreground">9 chains</span>
+        <span>1 toggle</span>
+      </div>
     </div>
   );
 }
