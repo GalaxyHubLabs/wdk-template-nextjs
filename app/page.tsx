@@ -187,7 +187,8 @@ export default function Home() {
             <FeatureCard
               visual={<AgentVisual />}
               title="AI-agent-ready"
-              body="A clean lib/wdk-client.ts boundary exposes openWallet, send, quote, balances, and account switching. Agents drive the wallet without touching React."
+              body="Built-in MCP server at /api/mcp exposes read tools to any agent that speaks the Model Context Protocol. Walk-through in /agents."
+              href="/agents"
             />
             <FeatureCard
               visual={<WatchVisual />}
@@ -242,20 +243,39 @@ function FeatureCard({
   visual,
   title,
   body,
+  href,
 }: {
   visual: React.ReactNode;
   title: string;
   body: string;
+  href?: string;
 }) {
-  return (
-    <div className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
+  const inner = (
+    <>
       <div className="mb-3 h-16">{visual}</div>
-      <h3 className="text-base font-semibold">{title}</h3>
+      <h3 className="text-base font-semibold">
+        {title}
+        {href && (
+          <span className="ml-1 text-brand opacity-0 transition-opacity group-hover:opacity-100">
+            →
+          </span>
+        )}
+      </h3>
       <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
         {body}
       </p>
-    </div>
+    </>
   );
+  const className =
+    "group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950";
+  if (href) {
+    return (
+      <Link href={href} className={`${className} block`}>
+        {inner}
+      </Link>
+    );
+  }
+  return <div className={className}>{inner}</div>;
 }
 
 // ─── Per-feature visuals ─────────────────────────────────────────────
