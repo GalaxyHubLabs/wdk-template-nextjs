@@ -20,6 +20,12 @@ import { getAddressBook, type AddressEntry } from "@/lib/address-book";
 import { CHAIN_CONFIGS, NETWORK_LABEL, networkSpec } from "@/lib/chains";
 import { getCustomTokens } from "@/lib/custom-tokens";
 import { looksLikeName, resolveName } from "@/lib/name-resolution";
+import {
+  getRecentRecipients,
+  isKnownRecipient,
+  rememberRecipient,
+  type RecentRecipient,
+} from "@/lib/recent-recipients";
 import { hasVault } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { cn, formatBalance, truncate } from "@/lib/utils";
@@ -75,15 +81,20 @@ export default function SendPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [bookEntries, setBookEntries] = useState<AddressEntry[]>([]);
+  const [recents, setRecents] = useState<RecentRecipient[]>([]);
+  /** When true, the user has acknowledged sending to a fresh address. */
+  const [newAddressAck, setNewAddressAck] = useState(false);
   /** ENS / SNS resolution state. `resolvedAddress` is null both before
    *  the user types a name and after a name fails to resolve. */
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [resolveFailed, setResolveFailed] = useState(false);
 
-  // Load the active chain's saved addresses for the recipient picker.
+  // Load the active chain's saved addresses + recent recipients for
+  // the picker. Both feed the same chip strip below the address input.
   useEffect(() => {
     setBookEntries(getAddressBook(activeChain));
+    setRecents(getRecentRecipients(activeChain));
   }, [activeChain]);
 
   // Name resolution. Fires whenever the recipient field looks like a
@@ -135,7 +146,14 @@ export default function SendPage() {
     setQuote(null);
     setError(null);
     setAssetKey("native");
+    setNewAddressAck(false);
   }, [activeChain]);
+
+  // Clear the new-address acknowledgement whenever the recipient field
+  // changes — re-typing means re-confirming.
+  useEffect(() => {
+    setNewAddressAck(false);
+  }, [recipient]);
 
   const activeAccount = handle?.accounts[activeChain];
   const config = CHAIN_CONFIGS[activeChain];
@@ -230,12 +248,24 @@ export default function SendPage() {
     resolvedAddress ?? (recipient.trim() || "");
   const recipientIsValid = isLikelyAddressFor(activeChain, effectiveRecipient);
 
+  /** Has this exact recipient ever been used / saved before? Used to
+   *  surface a "first-time sending to this address" warning, which is
+   *  the simplest defence against the address-replacement phishing
+   *  pattern. */
+  const isNewRecipient =
+    recipientIsValid &&
+    !isKnownRecipient(activeChain, effectiveRecipient) &&
+    !bookEntries.some(
+      (e) => e.address.toLowerCase() === effectiveRecipient.toLowerCase(),
+    );
+
   const canReview =
     recipientIsValid &&
     !resolving &&
     amountUnits != null &&
     amountUnits > 0n &&
-    amountUnits <= asset.balance;
+    amountUnits <= asset.balance &&
+    (!isNewRecipient || newAddressAck);
 
   if (!handle || !activeAccount) {
     return (
@@ -295,6 +325,16 @@ export default function SendPage() {
           );
       setSignature(result.signature);
       setStep("success");
+      // Remember the recipient locally so future sends to the same
+      // address don't trigger the "first time" warning and so the
+      // chip appears under the recipient input next time.
+      rememberRecipient({
+        chain: activeChain,
+        address: effectiveRecipient,
+        // Carry the user's typed name across (e.g. "vitalik.eth") so
+        // the chip can show a friendly label rather than just hex.
+        label: looksLikeName(recipient) ? recipient.trim() : "",
+      });
       // Optimistic local update — the next /wallet refresh will reconcile
       // with the on-chain truth, but the immediate-feedback feel matters
       // here. Native asset always pays gas; token asset spends the token
@@ -498,6 +538,55 @@ export default function SendPage() {
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Recently used recipients on this chain. Capped at the
+                    same six-chip cap as the address book so the two
+                    strips have a consistent visual weight. */}
+                {recents.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+                      Recent
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recents.slice(0, 6).map((entry) => (
+                        <button
+                          key={`${entry.chain}-${entry.address}`}
+                          type="button"
+                          onClick={() =>
+                            setRecipient(entry.label || entry.address)
+                          }
+                          className="rounded-full border border-zinc-200 px-2.5 py-1 font-mono text-[11px] hover:bg-zinc-50 hover:border-brand dark:border-zinc-800 dark:hover:bg-zinc-900"
+                        >
+                          {entry.label || truncate(entry.address, 4, 4)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* First-time-sending warning. Surfaces explicitly when
+                    the typed recipient has never been a destination
+                    before on this chain, blocks Review until the user
+                    acknowledges by ticking the checkbox. Cheap layer
+                    against the address-replacement phishing pattern. */}
+                {isNewRecipient && (
+                  <label className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+                    <input
+                      type="checkbox"
+                      checked={newAddressAck}
+                      onChange={(e) => setNewAddressAck(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-xs text-amber-800 dark:text-amber-200">
+                      First time sending to{" "}
+                      <span className="font-mono">
+                        {truncate(effectiveRecipient, 6, 4)}
+                      </span>
+                      . Double-check the address — transactions on{" "}
+                      {config.label} are irreversible. Tick to continue.
+                    </span>
+                  </label>
                 )}
               </div>
 

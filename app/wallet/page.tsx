@@ -16,6 +16,7 @@ import {
   Plus,
   RefreshCcw,
   Settings,
+  Star,
   Trash2,
 } from "lucide-react";
 
@@ -38,6 +39,10 @@ import {
   removeCustomToken,
   type CustomToken,
 } from "@/lib/custom-tokens";
+import {
+  isFavoriteToken,
+  toggleFavoriteToken,
+} from "@/lib/token-favorites";
 import {
   formatChange,
   formatUsd,
@@ -81,6 +86,9 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
   const [customTokens, setCustomTokens] = useState<CustomToken[]>([]);
   const [customBalances, setCustomBalances] = useState<Record<string, bigint>>({});
+  /** Re-renders the token list whenever a star is toggled. The set
+   *  of favorites itself lives in localStorage via `lib/token-favorites`. */
+  const [favoritesTick, setFavoritesTick] = useState(0);
   /** Last 3 Solana transactions for the active account. `null` while the
    *  initial fetch is in-flight; `[]` after a confirmed empty response. */
   const [recentTx, setRecentTx] = useState<SolanaTxSummary[] | null>(null);
@@ -605,42 +613,86 @@ export default function WalletPage() {
             </div>
 
             <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-              {/* Canonical Tether tokens (USDT, XAUt, …) */}
-              {activeSpec.tetherTokens.map((token) => {
-                const bal = tetherBalances[activeChain]?.[token.address] ?? null;
-                const usdValue = toUsd(bal, token.decimals, prices[token.priceId]);
-                return (
+              {(() => {
+                // Build a unified row list so favorites can float to the
+                // top regardless of whether they're canonical Tether
+                // tokens or user-imported custom tokens. The render is
+                // stable: within each (favorited / non-favorited) group
+                // the original order is preserved.
+                type Row = {
+                  address: string;
+                  logo?: string;
+                  symbol: string;
+                  name: string;
+                  balance: bigint | null;
+                  decimals: number;
+                  usdValue: number | null;
+                  change: number | undefined;
+                  onRemove?: () => void;
+                };
+                const rows: Row[] = [
+                  ...activeSpec.tetherTokens.map((token): Row => {
+                    const bal =
+                      tetherBalances[activeChain]?.[token.address] ?? null;
+                    return {
+                      address: token.address,
+                      logo: token.logo,
+                      symbol: token.symbol,
+                      name: `${token.name} on ${activeConfig.label}`,
+                      balance: bal,
+                      decimals: token.decimals,
+                      usdValue: toUsd(
+                        bal,
+                        token.decimals,
+                        prices[token.priceId],
+                      ),
+                      change: priceChanges[token.priceId],
+                    };
+                  }),
+                  ...customTokens.map((token): Row => ({
+                    address: token.address,
+                    logo: token.logo,
+                    symbol: token.symbol,
+                    name: token.name,
+                    balance: customBalances[token.address] ?? null,
+                    decimals: token.decimals,
+                    usdValue: null,
+                    change: undefined,
+                    onRemove: () => {
+                      removeCustomToken(activeChain, token.address);
+                      setCustomTokens(getCustomTokens(activeChain));
+                    },
+                  })),
+                ];
+                // Stable sort: favorites first. We reference favoritesTick
+                // so toggling re-renders without us tracking a Set in
+                // React state.
+                void favoritesTick;
+                rows.sort((a, b) => {
+                  const fa = isFavoriteToken(activeChain, a.address) ? 0 : 1;
+                  const fb = isFavoriteToken(activeChain, b.address) ? 0 : 1;
+                  return fa - fb;
+                });
+                return rows.map((row) => (
                   <TokenRow
-                    key={token.address}
-                    logo={token.logo}
-                    symbol={token.symbol}
-                    name={`${token.name} on ${activeConfig.label}`}
-                    balance={bal}
-                    decimals={token.decimals}
-                    usdValue={usdValue}
-                    change={priceChanges[token.priceId]}
+                    key={row.address}
+                    logo={row.logo}
+                    symbol={row.symbol}
+                    name={row.name}
+                    balance={row.balance}
+                    decimals={row.decimals}
+                    usdValue={row.usdValue}
+                    change={row.change}
                     hidden={balanceHidden}
+                    favorite={isFavoriteToken(activeChain, row.address)}
+                    onToggleFavorite={() => {
+                      toggleFavoriteToken(activeChain, row.address);
+                      setFavoritesTick((t) => t + 1);
+                    }}
+                    onRemove={row.onRemove}
                   />
-                );
-              })}
-              {/* User-added tokens */}
-              {customTokens.map((token) => (
-                <TokenRow
-                  key={token.address}
-                  logo={token.logo}
-                  symbol={token.symbol}
-                  name={token.name}
-                  balance={customBalances[token.address] ?? null}
-                  decimals={token.decimals}
-                  usdValue={null}
-                  change={undefined}
-                  hidden={balanceHidden}
-                  onRemove={() => {
-                    removeCustomToken(activeChain, token.address);
-                    setCustomTokens(getCustomTokens(activeChain));
-                  }}
-                />
-              ))}
+                ));
+              })()}
             </ul>
 
             {activeSpec.tetherTokens.length === 0 && customTokens.length === 0 && (
@@ -676,6 +728,8 @@ function TokenRow({
   usdValue,
   change,
   hidden,
+  favorite,
+  onToggleFavorite,
   onRemove,
 }: {
   logo?: string;
@@ -686,6 +740,8 @@ function TokenRow({
   usdValue: number | null;
   change: number | undefined;
   hidden: boolean;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   onRemove?: () => void;
 }) {
   return (
@@ -705,11 +761,36 @@ function TokenRow({
           </div>
         )}
         <div className="leading-tight">
-          <p className="text-sm font-medium">{symbol}</p>
+          <p className="flex items-center gap-1 text-sm font-medium">
+            {symbol}
+            {favorite && (
+              <Star
+                size={11}
+                className="fill-amber-400 text-amber-400"
+                aria-label="Pinned"
+              />
+            )}
+          </p>
           <p className="text-xs text-zinc-500">{name}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleFavorite}
+          aria-label={favorite ? `Unpin ${symbol}` : `Pin ${symbol}`}
+          className={cn(
+            "rounded-md p-1.5 transition-all",
+            favorite
+              ? "text-amber-500"
+              : "text-zinc-300 opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:text-zinc-600",
+          )}
+        >
+          <Star
+            size={14}
+            className={favorite ? "fill-amber-400" : ""}
+          />
+        </button>
         <div className="flex flex-col items-end">
           <div className="font-mono text-sm">
             {hidden ? (

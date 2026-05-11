@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
+import { AutoLock } from "@/components/auto-lock";
 import { CommandPalette } from "@/components/command-palette";
 import { ThemeToggle, themeInitScript } from "@/components/theme";
 import { Toaster } from "@/components/toast";
@@ -84,6 +85,7 @@ export default function RootLayout({
           <ThemeToggle />
         </div>
         {children}
+        <AutoLock />
         <CommandPalette />
         <Toaster />
       </body>

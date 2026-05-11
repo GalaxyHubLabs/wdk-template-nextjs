@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Lock,
   Monitor,
   Moon,
   Pencil,
@@ -24,6 +25,11 @@ import {
 } from "lucide-react";
 
 import { AddressAvatar } from "@/components/ui/avatar";
+import {
+  AUTO_LOCK_PRESETS,
+  loadAutoLockMinutes,
+  saveAutoLockMinutes,
+} from "@/components/auto-lock";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +48,8 @@ import {
   getAllOverrides,
   setRpcOverride,
 } from "@/lib/rpc-overrides";
+import { resetRecentRecipients } from "@/lib/recent-recipients";
+import { resetTokenFavorites } from "@/lib/token-favorites";
 import {
   getWatchList,
   removeWatchEntry,
@@ -69,6 +77,7 @@ export default function SettingsPage() {
   const [rpcOverrides, setRpcOverrides] = useState<Record<string, string>>({});
   const [rpcExpanded, setRpcExpanded] = useState<string | null>(null);
   const [rpcDraft, setRpcDraft] = useState<Record<string, string>>({});
+  const [autoLockMin, setAutoLockMin] = useState<number>(15);
   const [switching, setSwitching] = useState(false);
   const [renaming, setRenaming] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -93,6 +102,7 @@ export default function SettingsPage() {
     setAccounts(getAccounts());
     setWatchList(getWatchList());
     setRpcOverrides(getAllOverrides() as Record<string, string>);
+    setAutoLockMin(loadAutoLockMinutes());
   }, []);
 
   if (!handle) {
@@ -204,6 +214,8 @@ export default function SettingsPage() {
     resetAccounts();
     resetWatchList();
     clearAllOverrides();
+    resetRecentRecipients();
+    resetTokenFavorites();
     setShowWipeConfirm(false);
     toast.info("Wallet wiped from this device.");
     router.replace("/");
@@ -302,37 +314,80 @@ export default function SettingsPage() {
 
         {/* Privacy */}
         <Card>
-          <CardTitle>Privacy</CardTitle>
+          <CardTitle>Privacy &amp; security</CardTitle>
           <CardDescription className="mt-1 mb-4">
-            Hide every balance numeric value across the wallet.
+            Local-only preferences. None of these settings leave your device.
           </CardDescription>
-          <div className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-3 dark:border-zinc-800">
-            <div className="flex items-center gap-3">
-              {balanceHidden ? <EyeOff size={18} /> : <Eye size={18} />}
-              <div className="leading-tight">
-                <p className="text-sm font-medium">Hide balances</p>
-                <p className="text-xs text-zinc-500">
-                  Show <code>••••</code> instead of amounts.
-                </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                {balanceHidden ? <EyeOff size={18} /> : <Eye size={18} />}
+                <div className="leading-tight">
+                  <p className="text-sm font-medium">Hide balances</p>
+                  <p className="text-xs text-zinc-500">
+                    Show <code>••••</code> instead of amounts.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={balanceHidden}
+                onClick={() => setBalanceHidden(!balanceHidden)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  balanceHidden ? "bg-brand" : "bg-zinc-200 dark:bg-zinc-800",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform",
+                    balanceHidden ? "translate-x-5" : "translate-x-0.5",
+                  )}
+                />
+              </button>
+            </div>
+
+            {/* Auto-lock — idle timeout */}
+            <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Lock size={18} />
+                <div className="flex-1 leading-tight">
+                  <p className="text-sm font-medium">Auto-lock</p>
+                  <p className="text-xs text-zinc-500">
+                    Re-lock the wallet after a period of inactivity.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-5 gap-1.5">
+                {AUTO_LOCK_PRESETS.map(({ value, label }) => {
+                  const active = autoLockMin === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setAutoLockMin(value);
+                        saveAutoLockMinutes(value);
+                        toast.success(
+                          value === 0
+                            ? "Auto-lock disabled."
+                            : `Auto-lock set to ${label}.`,
+                        );
+                      }}
+                      className={cn(
+                        "rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                        active
+                          ? "bg-foreground text-background"
+                          : "border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={balanceHidden}
-              onClick={() => setBalanceHidden(!balanceHidden)}
-              className={cn(
-                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                balanceHidden ? "bg-brand" : "bg-zinc-200 dark:bg-zinc-800",
-              )}
-            >
-              <span
-                className={cn(
-                  "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform",
-                  balanceHidden ? "translate-x-5" : "translate-x-0.5",
-                )}
-              />
-            </button>
           </div>
         </Card>
 
