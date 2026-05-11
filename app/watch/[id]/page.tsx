@@ -18,6 +18,7 @@ import { AddressAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CHAIN_CONFIGS,
   NETWORK_LABEL,
@@ -296,16 +297,24 @@ export default function WatchAddressPage() {
           <div className="mt-6 flex items-end justify-between">
             <div>
               <CardDescription>Total value</CardDescription>
-              <p className="mt-1 text-3xl font-semibold tracking-tight">
-                {balanceHidden ? "••••" : formatUsd(totalUsd)}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                {balanceHidden
-                  ? "—"
-                  : native == null
-                    ? "—"
-                    : `${formatBalance(native, config.nativeDecimals)} ${config.nativeSymbol}`}
-              </p>
+              <div className="mt-1 text-3xl font-semibold tracking-tight">
+                {balanceHidden ? (
+                  "••••"
+                ) : native == null ? (
+                  <Skeleton className="h-9 w-32" />
+                ) : (
+                  formatUsd(totalUsd)
+                )}
+              </div>
+              <div className="mt-1 text-xs text-zinc-500">
+                {balanceHidden ? (
+                  "—"
+                ) : native == null ? (
+                  <Skeleton className="mt-1 h-3 w-20" />
+                ) : (
+                  `${formatBalance(native, config.nativeDecimals)} ${config.nativeSymbol}`
+                )}
+              </div>
             </div>
             <Button
               variant="ghost"

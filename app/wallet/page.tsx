@@ -22,6 +22,7 @@ import { AddressAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Dropdown } from "@/components/ui/dropdown";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CHAIN_CONFIGS,
   CHAIN_IDS,
@@ -37,15 +38,19 @@ import {
   type CustomToken,
 } from "@/lib/custom-tokens";
 import {
+  formatChange,
   formatUsd,
+  getPriceChanges,
   getPrices,
   toUsd,
 } from "@/lib/prices";
 import {
   getNativeBalance,
+  getSolanaRecentTransactions,
   getTetherTokenBalances,
   getTokenBalance,
   switchNetwork,
+  type SolanaTxSummary,
   type WalletHandle,
 } from "@/lib/wdk-client";
 import { hasVault } from "@/lib/storage";
@@ -62,6 +67,7 @@ export default function WalletPage() {
   const nativeBalances = useWalletStore((s) => s.nativeBalances);
   const tetherBalances = useWalletStore((s) => s.tetherBalances);
   const prices = useWalletStore((s) => s.prices);
+  const priceChanges = useWalletStore((s) => s.priceChanges);
   const setAllBalances = useWalletStore((s) => s.setAllBalances);
   const setPrices = useWalletStore((s) => s.setPrices);
   const clearBalances = useWalletStore((s) => s.clearBalances);
@@ -74,6 +80,9 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
   const [customTokens, setCustomTokens] = useState<CustomToken[]>([]);
   const [customBalances, setCustomBalances] = useState<Record<string, bigint>>({});
+  /** Last 3 Solana transactions for the active account. `null` while the
+   *  initial fetch is in-flight; `[]` after a confirmed empty response. */
+  const [recentTx, setRecentTx] = useState<SolanaTxSummary[] | null>(null);
 
   useEffect(() => {
     setCustomTokens(getCustomTokens(activeChain));
@@ -93,7 +102,7 @@ export default function WalletPage() {
       setRefreshing(true);
       try {
         // Fetch native + Tether tokens + USD prices in parallel
-        const [chainResults, priceData] = await Promise.all([
+        const [chainResults, priceData, changeData] = await Promise.all([
           Promise.all(
             CHAIN_IDS.map(async (chain) => {
               const [native, tethers] = await Promise.all([
@@ -104,6 +113,7 @@ export default function WalletPage() {
             }),
           ),
           getPrices(),
+          getPriceChanges(),
         ]);
         const natives: Partial<Record<ChainId, bigint>> = {};
         const tethers: Partial<Record<ChainId, Record<string, bigint>>> = {};
@@ -112,7 +122,10 @@ export default function WalletPage() {
           tethers[chain] = tetherMap;
         }
         setAllBalances(natives, tethers);
-        setPrices(priceData as Record<string, number>);
+        setPrices(
+          priceData as Record<string, number>,
+          changeData as Record<string, number>,
+        );
 
         // Custom tokens for the active chain
         const active = getCustomTokens(activeChain);
@@ -141,6 +154,26 @@ export default function WalletPage() {
       void refreshBalances(handle);
     }
   }, [handle, refreshBalances]);
+
+  // Pull the most recent Solana transactions for the active account. Other
+  // chains link out to their explorer instead — keeping multi-chain
+  // history coverage out of scope avoids us partially reimplementing the
+  // SDK's transaction view for every backend.
+  useEffect(() => {
+    if (!handle || activeChain !== "solana") {
+      setRecentTx(null);
+      return;
+    }
+    setRecentTx(null);
+    void (async () => {
+      try {
+        const txs = await getSolanaRecentTransactions(handle, 3);
+        setRecentTx(txs);
+      } catch {
+        setRecentTx([]);
+      }
+    })();
+  }, [handle, activeChain, handle?.network, handle?.accountIndex]);
 
   const handleNetworkChange = useCallback(
     async (next: NetworkKey) => {
@@ -194,6 +227,10 @@ export default function WalletPage() {
     (sum, v) => sum + (v ?? 0),
     0,
   );
+  /** True once at least one chain's native balance has resolved. Used to
+   *  decide between showing a skeleton (initial load) versus the
+   *  computed total (real data, possibly $0). */
+  const balancesLoaded = CHAIN_IDS.some((c) => nativeBalances[c] != null);
 
   const nativeUsdValue = toUsd(
     nativeBalance ?? 0n,
@@ -240,9 +277,15 @@ export default function WalletPage() {
                 {balanceHidden ? <EyeOff size={12} /> : <Eye size={12} />}
               </button>
             </div>
-            <p className="mt-1 text-4xl font-semibold tracking-tight">
-              {balanceHidden ? "••••" : formatUsd(portfolioTotal)}
-            </p>
+            <div className="mt-1 text-4xl font-semibold tracking-tight">
+              {balanceHidden ? (
+                "••••"
+              ) : balancesLoaded ? (
+                formatUsd(portfolioTotal)
+              ) : (
+                <Skeleton className="h-10 w-40" />
+              )}
+            </div>
             <p className="mt-1 text-xs text-zinc-500">
               across {CHAIN_IDS.length} chains · {NETWORK_LABEL[handle.network]}
             </p>
@@ -398,18 +441,31 @@ export default function WalletPage() {
             <div className="mt-6 flex items-end justify-between">
               <div>
                 <CardDescription>Balance</CardDescription>
-                <p className="mt-1 text-3xl font-semibold tracking-tight">
-                  {balanceHidden
-                    ? "••••"
-                    : nativeBalance == null
-                      ? "—"
-                      : formatBalance(nativeBalance, activeConfig.nativeDecimals)}
-                  <span className="ml-1.5 text-lg font-medium text-zinc-500">
+                <p className="mt-1 flex items-baseline gap-1.5 text-3xl font-semibold tracking-tight">
+                  {balanceHidden ? (
+                    "••••"
+                  ) : nativeBalance == null ? (
+                    <Skeleton className="h-8 w-32" />
+                  ) : (
+                    formatBalance(nativeBalance, activeConfig.nativeDecimals)
+                  )}
+                  <span className="text-lg font-medium text-zinc-500">
                     {activeConfig.nativeSymbol}
                   </span>
                 </p>
-                {!balanceHidden && nativeUsdValue != null && (
-                  <p className="mt-0.5 text-sm text-zinc-500">{formatUsd(nativeUsdValue)}</p>
+                {!balanceHidden && (
+                  <div className="mt-0.5 flex items-center gap-2 text-sm">
+                    {nativeUsdValue == null ? (
+                      <Skeleton className="h-4 w-20" />
+                    ) : (
+                      <span className="text-zinc-500">
+                        {formatUsd(nativeUsdValue)}
+                      </span>
+                    )}
+                    <PriceChangeBadge
+                      change={priceChanges[activeConfig.nativePriceId]}
+                    />
+                  </div>
                 )}
               </div>
               <Button
@@ -490,6 +546,27 @@ export default function WalletPage() {
           </div>
         )}
 
+        {/* Recent activity */}
+        {activeAccount && (
+          <Card>
+            <div className="flex items-center justify-between">
+              <CardDescription>Recent activity</CardDescription>
+              <Link
+                href="/wallet/history"
+                className="text-xs text-zinc-500 hover:text-foreground"
+              >
+                See all →
+              </Link>
+            </div>
+            <ActivityList
+              chain={activeChain}
+              recentTx={recentTx}
+              spec={activeSpec}
+              address={activeAccount.address}
+            />
+          </Card>
+        )}
+
         {/* Tokens card */}
         {activeAccount && (
           <Card>
@@ -518,6 +595,7 @@ export default function WalletPage() {
                     balance={bal}
                     decimals={token.decimals}
                     usdValue={usdValue}
+                    change={priceChanges[token.priceId]}
                     hidden={balanceHidden}
                   />
                 );
@@ -532,6 +610,7 @@ export default function WalletPage() {
                   balance={customBalances[token.address] ?? null}
                   decimals={token.decimals}
                   usdValue={null}
+                  change={undefined}
                   hidden={balanceHidden}
                   onRemove={() => {
                     removeCustomToken(activeChain, token.address);
@@ -572,6 +651,7 @@ function TokenRow({
   balance,
   decimals,
   usdValue,
+  change,
   hidden,
   onRemove,
 }: {
@@ -581,6 +661,7 @@ function TokenRow({
   balance: bigint | null;
   decimals: number;
   usdValue: number | null;
+  change: number | undefined;
   hidden: boolean;
   onRemove?: () => void;
 }) {
@@ -606,12 +687,25 @@ function TokenRow({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="text-right">
-          <p className="font-mono text-sm">
-            {hidden ? "••••" : balance == null ? "—" : formatBalance(balance, decimals)}
-          </p>
-          {!hidden && usdValue != null && (
-            <p className="text-[11px] text-zinc-500">{formatUsd(usdValue)}</p>
+        <div className="flex flex-col items-end">
+          <div className="font-mono text-sm">
+            {hidden ? (
+              "••••"
+            ) : balance == null ? (
+              <Skeleton className="h-4 w-16" />
+            ) : (
+              formatBalance(balance, decimals)
+            )}
+          </div>
+          {!hidden && (
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
+              {usdValue != null ? (
+                <span className="text-zinc-500">{formatUsd(usdValue)}</span>
+              ) : balance != null ? null : (
+                <Skeleton className="h-3 w-10" />
+              )}
+              <PriceChangeBadge change={change} compact />
+            </div>
           )}
         </div>
         {onRemove && (
@@ -627,6 +721,134 @@ function TokenRow({
       </div>
     </li>
   );
+}
+
+/**
+ * Coloured percentage pill for a 24-hour price change. Hides itself
+ * silently when there's no change data (e.g. CoinGecko throttled us)
+ * so the layout doesn't reserve dead space.
+ */
+function PriceChangeBadge({
+  change,
+  compact = false,
+}: {
+  change: number | undefined;
+  compact?: boolean;
+}) {
+  if (change == null || !isFinite(change)) return null;
+  const isUp = change >= 0;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full font-medium",
+        compact ? "px-1 py-0 text-[10px]" : "px-1.5 py-0.5 text-[11px]",
+        isUp
+          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+          : "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400",
+      )}
+    >
+      {formatChange(change)}
+    </span>
+  );
+}
+
+/**
+ * Inline recent-activity list. For Solana we render the last 3 signatures
+ * with status + relative timestamp directly. For every other chain we
+ * surface a single "View activity on <explorer>" affordance — the WDK
+ * modules for those chains don't expose a list endpoint, and we'd rather
+ * link out than ship a partial reimplementation per chain.
+ */
+function ActivityList({
+  chain,
+  recentTx,
+  spec,
+  address,
+}: {
+  chain: ChainId;
+  recentTx: SolanaTxSummary[] | null;
+  spec: ReturnType<typeof networkSpec>;
+  address: string;
+}) {
+  if (chain !== "solana") {
+    return (
+      <a
+        href={spec.addressExplorer(address)}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-600 transition-colors hover:border-brand/40 hover:text-foreground dark:border-zinc-800 dark:text-zinc-300"
+      >
+        <span>View activity on the chain explorer</span>
+        <ExternalLink size={14} className="text-zinc-400" />
+      </a>
+    );
+  }
+  if (recentTx == null) {
+    return (
+      <div className="mt-3 space-y-2">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    );
+  }
+  if (recentTx.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-zinc-500">
+        No transactions on this account yet — when you send or receive, the
+        last few signatures will appear here.
+      </p>
+    );
+  }
+  return (
+    <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+      {recentTx.map((tx) => {
+        const failed = tx.err != null;
+        return (
+          <li key={tx.signature} className="flex items-center justify-between gap-3 py-2.5">
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate font-mono text-xs">
+                {tx.signature.slice(0, 8)}…{tx.signature.slice(-6)}
+              </p>
+              <p className="text-[11px] text-zinc-500">
+                {relativeTime(tx.blockTime)} · slot {tx.slot.toLocaleString()}
+              </p>
+            </div>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                failed
+                  ? "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+                  : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400",
+              )}
+            >
+              {failed ? "Failed" : "Confirmed"}
+            </span>
+            <a
+              href={spec.txExplorer(tx.signature)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View transaction on explorer"
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+            >
+              <ExternalLink size={12} />
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Compact "5m ago / 2h ago / Apr 3" formatter for transaction lists. */
+function relativeTime(blockTime: number | null): string {
+  if (!blockTime) return "—";
+  const diffSec = Math.max(0, Math.floor(Date.now() / 1000 - blockTime));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86_400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 7 * 86_400) return `${Math.floor(diffSec / 86_400)}d ago`;
+  return new Date(blockTime * 1000).toLocaleDateString();
 }
 
 function ChainBadge({ chain, size = 24 }: { chain: ChainId; size?: number }) {

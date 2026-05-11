@@ -35,6 +35,8 @@ export interface WalletState {
   tetherBalances: ChainTokens;
   /** USD prices keyed by CoinGecko asset id. */
   prices: Record<string, number>;
+  /** 24-hour percentage change for the same CoinGecko ids. */
+  priceChanges: Record<string, number>;
   /** Hide every balance numeric value from screen — persisted preference. */
   balanceHidden: boolean;
   status: "idle" | "loading" | "ready" | "error";
@@ -48,7 +50,10 @@ export interface WalletState {
     natives: Partial<Record<ChainId, bigint>>,
     tethers: Partial<Record<ChainId, Record<string, bigint>>>,
   ) => void;
-  setPrices: (prices: Record<string, number>) => void;
+  setPrices: (
+    prices: Record<string, number>,
+    changes?: Record<string, number>,
+  ) => void;
   clearBalances: () => void;
   setBalanceHidden: (hidden: boolean) => void;
   toggleBalanceHidden: () => void;
@@ -92,6 +97,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   nativeBalances: emptyChainMap(),
   tetherBalances: {},
   prices: {},
+  priceChanges: {},
   balanceHidden: loadBalanceHidden(),
   status: "idle",
   error: null,
@@ -109,7 +115,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       nativeBalances: { ...s.nativeBalances, ...natives },
       tetherBalances: { ...s.tetherBalances, ...tethers },
     })),
-  setPrices: (prices) => set({ prices }),
+  setPrices: (prices, changes) =>
+    set((s) => ({
+      prices,
+      priceChanges: changes ?? s.priceChanges,
+    })),
   clearBalances: () =>
     set({
       nativeBalances: emptyChainMap(),

@@ -19,6 +19,7 @@ const ASSET_IDS = [
   "the-open-network",
   "ethereum",
   "binancecoin",
+  "matic-network",
   "tether",
   "tether-gold",
 ] as const;
@@ -27,26 +28,43 @@ type AssetId = (typeof ASSET_IDS)[number];
 
 const CACHE_TTL_MS = 60_000;
 
-let cache: { at: number; prices: Partial<Record<AssetId, number>> } = {
+/** 24-hour price change percentage. Positive = up, negative = down. */
+export type PriceChanges = Partial<Record<AssetId, number>>;
+
+let cache: {
+  at: number;
+  prices: Partial<Record<AssetId, number>>;
+  changes: PriceChanges;
+} = {
   at: 0,
   prices: {},
+  changes: {},
 };
 
-async function fetchAllPrices(): Promise<Partial<Record<AssetId, number>>> {
+async function fetchAllPrices(): Promise<{
+  prices: Partial<Record<AssetId, number>>;
+  changes: PriceChanges;
+}> {
   try {
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ASSET_IDS.join(",")}&vs_currencies=usd`;
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ASSET_IDS.join(",")}&vs_currencies=usd&include_24hr_change=true`;
     const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) return cache.prices;
-    const data = (await res.json()) as Record<string, { usd?: number }>;
-    const next: Partial<Record<AssetId, number>> = {};
+    if (!res.ok) return { prices: cache.prices, changes: cache.changes };
+    const data = (await res.json()) as Record<
+      string,
+      { usd?: number; usd_24h_change?: number }
+    >;
+    const prices: Partial<Record<AssetId, number>> = {};
+    const changes: PriceChanges = {};
     for (const id of ASSET_IDS) {
       const v = data[id]?.usd;
-      if (typeof v === "number") next[id] = v;
+      const ch = data[id]?.usd_24h_change;
+      if (typeof v === "number") prices[id] = v;
+      if (typeof ch === "number") changes[id] = ch;
     }
-    cache = { at: Date.now(), prices: next };
-    return next;
+    cache = { at: Date.now(), prices, changes };
+    return { prices, changes };
   } catch {
-    return cache.prices;
+    return { prices: cache.prices, changes: cache.changes };
   }
 }
 
@@ -55,7 +73,26 @@ export async function getPrices(): Promise<Partial<Record<AssetId, number>>> {
   if (Date.now() - cache.at < CACHE_TTL_MS && Object.keys(cache.prices).length > 0) {
     return cache.prices;
   }
-  return fetchAllPrices();
+  const { prices } = await fetchAllPrices();
+  return prices;
+}
+
+/** Fetch (or read from cache) the 24-hour price-change percentages keyed by
+ *  the same CoinGecko asset ids as `getPrices()`. Cached jointly with
+ *  prices since they come from the same API call. */
+export async function getPriceChanges(): Promise<PriceChanges> {
+  if (Date.now() - cache.at < CACHE_TTL_MS && Object.keys(cache.prices).length > 0) {
+    return cache.changes;
+  }
+  const { changes } = await fetchAllPrices();
+  return changes;
+}
+
+/** Format a 24h change as a signed percentage with one decimal place. */
+export function formatChange(value: number | null | undefined): string {
+  if (value == null || !isFinite(value)) return "";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
 }
 
 /** Convert a raw balance (in chain-smallest units) to a USD number. */
