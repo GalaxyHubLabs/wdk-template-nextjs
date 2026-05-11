@@ -563,7 +563,12 @@ export const CHAIN_IDS: readonly ChainId[] = [
   "btc",
 ];
 
-export const DEFAULT_CHAIN: ChainId = "solana";
+// Ethereum is the default landing chain — broadest feature coverage
+// (every DeFi protocol module ships here first), most recognisable
+// asset symbols, and the deepest tooling story for first-time
+// reviewers. Users can flip to any other chain with one tap from
+// the dashboard picker.
+export const DEFAULT_CHAIN: ChainId = "evm";
 
 export const DEFAULT_NETWORK: NetworkKey =
   (process.env.NEXT_PUBLIC_DEFAULT_NETWORK as NetworkKey) || "testnet";
