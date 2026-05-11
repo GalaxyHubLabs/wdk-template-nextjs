@@ -82,3 +82,58 @@ export async function getNativeBalance(handle: WalletHandle): Promise<bigint> {
   }
   return 0n;
 }
+
+export interface SendQuote {
+  /** Network fee in lamports. */
+  fee: bigint;
+}
+
+export interface SendResult {
+  /** Transaction signature (Solana "hash"). */
+  signature: string;
+  /** Network fee paid, in lamports. */
+  fee: bigint;
+}
+
+/**
+ * Estimate the fee for sending native SOL to `recipient`.
+ * Throws if the recipient address is invalid or RPC unreachable.
+ */
+export async function quoteNativeSend(
+  handle: WalletHandle,
+  recipient: string,
+  amountLamports: bigint,
+): Promise<SendQuote> {
+  const result = (await handle.account.quoteSendTransaction({
+    to: recipient,
+    value: amountLamports,
+  })) as { fee?: bigint | number | string };
+  return { fee: coerceBigInt(result?.fee) };
+}
+
+/** Send native SOL. Returns the signature + final fee paid. */
+export async function sendNative(
+  handle: WalletHandle,
+  recipient: string,
+  amountLamports: bigint,
+): Promise<SendResult> {
+  const result = (await handle.account.sendTransaction({
+    to: recipient,
+    value: amountLamports,
+  })) as { hash?: string; fee?: bigint | number | string };
+  const signature = String(result?.hash ?? "");
+  if (!signature) throw new Error("Send succeeded but no signature returned.");
+  return { signature, fee: coerceBigInt(result?.fee) };
+}
+
+function coerceBigInt(v: unknown): bigint {
+  if (typeof v === "bigint") return v;
+  if (typeof v === "number") return BigInt(Math.floor(v));
+  if (typeof v === "string" && v.trim()) return BigInt(v);
+  return 0n;
+}
+
+/** Quick base58 sanity check for Solana addresses (32 bytes → 32-44 chars). */
+export function isLikelySolanaAddress(value: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value.trim());
+}
