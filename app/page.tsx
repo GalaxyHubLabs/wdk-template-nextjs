@@ -41,7 +41,7 @@ export default function Home() {
               href="/unlock"
               className={cn(
                 buttonStyles,
-                "w-full bg-foreground text-background hover:opacity-90 active:opacity-80",
+                "w-full bg-brand text-brand-foreground hover:opacity-90 active:opacity-80",
               )}
             >
               Unlock existing wallet
@@ -76,7 +76,7 @@ export default function Home() {
               href="/onboarding/create"
               className={cn(
                 buttonStyles,
-                "bg-foreground text-background hover:opacity-90 active:opacity-80 sm:min-w-[200px]",
+                "bg-brand text-brand-foreground hover:opacity-90 active:opacity-80 sm:min-w-[200px]",
               )}
             >
               Create new wallet

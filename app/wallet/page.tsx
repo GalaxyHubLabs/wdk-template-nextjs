@@ -21,6 +21,7 @@ import { Dropdown } from "@/components/ui/dropdown";
 import {
   CHAIN_CONFIGS,
   CHAIN_IDS,
+  COMING_SOON_CHAINS,
   NETWORK_LABEL,
   type ChainId,
   type NetworkKey,
@@ -32,9 +33,14 @@ import {
   type CustomToken,
 } from "@/lib/custom-tokens";
 import {
+  formatUsd,
+  getPrices,
+  toUsd,
+} from "@/lib/prices";
+import {
   getNativeBalance,
+  getTetherTokenBalances,
   getTokenBalance,
-  getUsdtBalance,
   switchNetwork,
   type WalletHandle,
 } from "@/lib/wdk-client";
@@ -47,12 +53,13 @@ export default function WalletPage() {
   const handle = useWalletStore((s) => s.handle);
   const activeChain = useWalletStore((s) => s.activeChain);
   const setActiveChain = useWalletStore((s) => s.setActiveChain);
-  const activeNetwork = useWalletStore((s) => s.activeNetwork);
   const setActiveNetwork = useWalletStore((s) => s.setActiveNetwork);
   const setHandle = useWalletStore((s) => s.setHandle);
   const nativeBalances = useWalletStore((s) => s.nativeBalances);
-  const usdtBalances = useWalletStore((s) => s.usdtBalances);
+  const tetherBalances = useWalletStore((s) => s.tetherBalances);
+  const prices = useWalletStore((s) => s.prices);
   const setAllBalances = useWalletStore((s) => s.setAllBalances);
+  const setPrices = useWalletStore((s) => s.setPrices);
   const clearBalances = useWalletStore((s) => s.clearBalances);
   const balanceHidden = useWalletStore((s) => s.balanceHidden);
   const toggleBalanceHidden = useWalletStore((s) => s.toggleBalanceHidden);
@@ -64,9 +71,6 @@ export default function WalletPage() {
   const [customTokens, setCustomTokens] = useState<CustomToken[]>([]);
   const [customBalances, setCustomBalances] = useState<Record<string, bigint>>({});
 
-  // Re-read custom tokens from localStorage whenever the active chain changes
-  // (each chain has its own list). The "tokens" page navigates back here
-  // after persisting, so a focus listener picks up out-of-band changes too.
   useEffect(() => {
     setCustomTokens(getCustomTokens(activeChain));
     const onFocus = () => setCustomTokens(getCustomTokens(activeChain));
@@ -84,25 +88,29 @@ export default function WalletPage() {
     async (h: WalletHandle) => {
       setRefreshing(true);
       try {
-        const results = await Promise.all(
-          CHAIN_IDS.map(async (chain) => {
-            const [native, usdt] = await Promise.all([
-              getNativeBalance(h, chain).catch(() => 0n),
-              getUsdtBalance(h, chain).catch(() => 0n),
-            ]);
-            return [chain, native, usdt] as const;
-          }),
-        );
+        // Fetch native + Tether tokens + USD prices in parallel
+        const [chainResults, priceData] = await Promise.all([
+          Promise.all(
+            CHAIN_IDS.map(async (chain) => {
+              const [native, tethers] = await Promise.all([
+                getNativeBalance(h, chain).catch(() => 0n),
+                getTetherTokenBalances(h, chain).catch(() => ({})),
+              ]);
+              return [chain, native, tethers] as const;
+            }),
+          ),
+          getPrices(),
+        ]);
         const natives: Partial<Record<ChainId, bigint>> = {};
-        const usdts: Partial<Record<ChainId, bigint>> = {};
-        for (const [chain, native, usdt] of results) {
+        const tethers: Partial<Record<ChainId, Record<string, bigint>>> = {};
+        for (const [chain, native, tetherMap] of chainResults) {
           natives[chain] = native;
-          usdts[chain] = usdt;
+          tethers[chain] = tetherMap;
         }
-        setAllBalances(natives, usdts);
+        setAllBalances(natives, tethers);
+        setPrices(priceData as Record<string, number>);
 
-        // Custom tokens — only fetch for the active chain (cheaper than
-        // running every chain's full custom list every refresh).
+        // Custom tokens for the active chain
         const active = getCustomTokens(activeChain);
         if (active.length > 0) {
           const entries = await Promise.all(
@@ -121,10 +129,9 @@ export default function WalletPage() {
         setRefreshing(false);
       }
     },
-    [activeChain, setAllBalances],
+    [activeChain, setAllBalances, setPrices],
   );
 
-  // Initial balance fetch when the wallet first loads.
   useEffect(() => {
     if (handle) {
       void refreshBalances(handle);
@@ -140,8 +147,6 @@ export default function WalletPage() {
         const newHandle = await switchNetwork(handle, next);
         setHandle(newHandle);
         setActiveNetwork(next);
-        // Balances will be refetched by the effect below once the new
-        // handle is in the store.
       } catch (err) {
         console.error("Failed to switch network:", err);
       } finally {
@@ -159,11 +164,40 @@ export default function WalletPage() {
     );
   }
 
+  // ─── Derived values ───────────────────────────────────────────────────
+
   const activeAccount = handle.accounts[activeChain];
   const activeConfig = CHAIN_CONFIGS[activeChain];
   const activeSpec = networkSpec(activeChain, handle.network);
   const nativeBalance = nativeBalances[activeChain] ?? null;
-  const usdtBalance = usdtBalances[activeChain] ?? null;
+
+  // Per-chain USD totals (for portfolio header)
+  const chainUsd: Partial<Record<ChainId, number>> = {};
+  for (const chain of CHAIN_IDS) {
+    const cfg = CHAIN_CONFIGS[chain];
+    const native = nativeBalances[chain];
+    const nativeUsd = toUsd(native ?? 0n, cfg.nativeDecimals, prices[cfg.nativePriceId]) ?? 0;
+    let tetherUsd = 0;
+    const spec = networkSpec(chain, handle.network);
+    const tetherBals = tetherBalances[chain] ?? {};
+    for (const t of spec.tetherTokens) {
+      const bal = tetherBals[t.address] ?? 0n;
+      tetherUsd += toUsd(bal, t.decimals, prices[t.priceId]) ?? 0;
+    }
+    chainUsd[chain] = nativeUsd + tetherUsd;
+  }
+  const portfolioTotal = Object.values(chainUsd).reduce<number>(
+    (sum, v) => sum + (v ?? 0),
+    0,
+  );
+
+  const nativeUsdValue = toUsd(
+    nativeBalance ?? 0n,
+    activeConfig.nativeDecimals,
+    prices[activeConfig.nativePriceId],
+  );
+
+  // ─── Handlers ────────────────────────────────────────────────────────
 
   async function copyAddress() {
     if (!activeAccount) return;
@@ -181,69 +215,108 @@ export default function WalletPage() {
     router.replace(hasVault() ? "/unlock" : "/");
   }
 
+  // ─── Render ──────────────────────────────────────────────────────────
+
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
       <div className="w-full max-w-xl space-y-6">
-        {/* Top bar: chain selector + network selector + lock */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Dropdown
-              ariaLabel="Select chain"
-              value={activeChain}
-              onChange={(v) => setActiveChain(v as ChainId)}
-              items={CHAIN_IDS.map((chain) => {
+        {/* Portfolio total — the headline of the wallet */}
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-xs uppercase tracking-wider text-zinc-500">
+                Portfolio
+              </p>
+              <button
+                type="button"
+                onClick={toggleBalanceHidden}
+                aria-label={balanceHidden ? "Show balances" : "Hide balances"}
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+              >
+                {balanceHidden ? <EyeOff size={12} /> : <Eye size={12} />}
+              </button>
+            </div>
+            <p className="mt-1 text-4xl font-semibold tracking-tight">
+              {balanceHidden ? "••••" : formatUsd(portfolioTotal)}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              across {CHAIN_IDS.length} chains · {NETWORK_LABEL[handle.network]}
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={lock} aria-label="Lock wallet">
+            <Lock size={14} /> Lock
+          </Button>
+        </div>
+
+        {/* Chain + network selectors */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Dropdown
+            ariaLabel="Select chain"
+            value={activeChain}
+            onChange={(v) => setActiveChain(v as ChainId)}
+            items={[
+              ...CHAIN_IDS.map((chain) => {
                 const c = CHAIN_CONFIGS[chain];
                 const hasAcc = Boolean(handle.accounts[chain]);
-                const bal = nativeBalances[chain];
+                const usd = chainUsd[chain];
                 return {
                   value: chain,
                   label: c.label,
                   sublabel: c.shortLabel,
                   leading: <ChainBadge chain={chain} />,
-                  trailing: hasAcc && bal != null && !balanceHidden
-                    ? `${formatBalance(bal, c.nativeDecimals)} ${c.nativeSymbol}`
-                    : undefined,
+                  trailing:
+                    hasAcc && !balanceHidden && usd != null
+                      ? formatUsd(usd)
+                      : undefined,
                   disabled: !hasAcc,
                 };
-              })}
-              triggerLeading={<ChainBadge chain={activeChain} />}
-            />
-            <Dropdown
-              ariaLabel="Select network"
-              value={handle.network}
-              onChange={(v) => void handleNetworkChange(v as NetworkKey)}
-              items={[
-                {
-                  value: "mainnet",
-                  label: "Mainnet",
-                  sublabel: "Live assets",
-                  leading: <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />,
-                },
-                {
-                  value: "testnet",
-                  label: "Testnet",
-                  sublabel: "Faucet funds only",
-                  leading: <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />,
-                },
-              ]}
-              triggerLeading={
-                <span
-                  className={cn(
-                    "inline-block h-1.5 w-1.5 rounded-full",
-                    handle.network === "mainnet" ? "bg-emerald-500" : "bg-amber-500",
-                  )}
-                />
-              }
-            />
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={lock}
-            aria-label="Lock wallet"
-          >
-            <Lock size={14} /> Lock
-          </Button>
+              }),
+              ...COMING_SOON_CHAINS.map((c) => ({
+                value: `__coming_soon_${c.shortLabel}`,
+                label: c.label,
+                sublabel: "Coming soon",
+                leading: (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.logo}
+                    alt={c.label}
+                    className="h-6 w-6 rounded-full bg-zinc-100 opacity-50 dark:bg-zinc-800"
+                    loading="lazy"
+                  />
+                ),
+                trailing: c.note as string,
+                disabled: true,
+              })),
+            ]}
+            triggerLeading={<ChainBadge chain={activeChain} />}
+          />
+          <Dropdown
+            ariaLabel="Select network"
+            value={handle.network}
+            onChange={(v) => void handleNetworkChange(v as NetworkKey)}
+            items={[
+              {
+                value: "mainnet",
+                label: "Mainnet",
+                sublabel: "Live assets",
+                leading: <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />,
+              },
+              {
+                value: "testnet",
+                label: "Testnet",
+                sublabel: "Faucet funds only",
+                leading: <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />,
+              },
+            ]}
+            triggerLeading={
+              <span
+                className={cn(
+                  "inline-block h-1.5 w-1.5 rounded-full",
+                  handle.network === "mainnet" ? "bg-emerald-500" : "bg-amber-500",
+                )}
+              />
+            }
+          />
         </div>
 
         {switchingNetwork && (
@@ -253,7 +326,7 @@ export default function WalletPage() {
           </div>
         )}
 
-        {/* Active chain account card */}
+        {/* Account card */}
         {activeAccount ? (
           <Card>
             <CardDescription>
@@ -290,17 +363,7 @@ export default function WalletPage() {
 
             <div className="mt-6 flex items-end justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <CardDescription>Balance</CardDescription>
-                  <button
-                    type="button"
-                    onClick={toggleBalanceHidden}
-                    aria-label={balanceHidden ? "Show balances" : "Hide balances"}
-                    className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
-                  >
-                    {balanceHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
+                <CardDescription>Balance</CardDescription>
                 <p className="mt-1 text-3xl font-semibold tracking-tight">
                   {balanceHidden
                     ? "••••"
@@ -311,6 +374,9 @@ export default function WalletPage() {
                     {activeConfig.nativeSymbol}
                   </span>
                 </p>
+                {!balanceHidden && nativeUsdValue != null && (
+                  <p className="mt-0.5 text-sm text-zinc-500">{formatUsd(nativeUsdValue)}</p>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -327,8 +393,8 @@ export default function WalletPage() {
           <Card>
             <CardTitle>Account unavailable</CardTitle>
             <CardDescription className="mt-2">
-              The {activeConfig.label} RPC was unreachable when this wallet
-              was opened. Lock and unlock to retry derivation.
+              The {activeConfig.label} RPC was unreachable when this wallet was
+              opened. Lock and unlock to retry derivation.
             </CardDescription>
           </Card>
         )}
@@ -339,7 +405,7 @@ export default function WalletPage() {
             <Link
               href="/wallet/send"
               className={cn(
-                "flex h-12 items-center justify-center rounded-lg bg-foreground text-background font-medium transition-all hover:opacity-90 active:opacity-80",
+                "flex h-12 items-center justify-center rounded-lg bg-brand text-brand-foreground font-medium transition-all hover:opacity-90 active:opacity-80",
               )}
             >
               Send
@@ -363,7 +429,7 @@ export default function WalletPage() {
           </div>
         )}
 
-        {/* Tokens card — canonical USDT (when configured) plus user-added tokens */}
+        {/* Tokens card */}
         {activeAccount && (
           <Card>
             <div className="flex items-center justify-between">
@@ -378,17 +444,23 @@ export default function WalletPage() {
             </div>
 
             <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-              {/* Canonical USDT row, when this chain × network has it */}
-              {activeSpec.usdt && (
-                <TokenRow
-                  logo={activeSpec.usdt.logo}
-                  symbol="USDT"
-                  name={`Tether USD on ${activeConfig.label}`}
-                  balance={usdtBalance}
-                  decimals={activeSpec.usdt.decimals}
-                  hidden={balanceHidden}
-                />
-              )}
+              {/* Canonical Tether tokens (USDT, XAUt, …) */}
+              {activeSpec.tetherTokens.map((token) => {
+                const bal = tetherBalances[activeChain]?.[token.address] ?? null;
+                const usdValue = toUsd(bal, token.decimals, prices[token.priceId]);
+                return (
+                  <TokenRow
+                    key={token.address}
+                    logo={token.logo}
+                    symbol={token.symbol}
+                    name={`${token.name} on ${activeConfig.label}`}
+                    balance={bal}
+                    decimals={token.decimals}
+                    usdValue={usdValue}
+                    hidden={balanceHidden}
+                  />
+                );
+              })}
               {/* User-added tokens */}
               {customTokens.map((token) => (
                 <TokenRow
@@ -398,6 +470,7 @@ export default function WalletPage() {
                   name={token.name}
                   balance={customBalances[token.address] ?? null}
                   decimals={token.decimals}
+                  usdValue={null}
                   hidden={balanceHidden}
                   onRemove={() => {
                     removeCustomToken(activeChain, token.address);
@@ -407,8 +480,7 @@ export default function WalletPage() {
               ))}
             </ul>
 
-            {/* Empty / hint states */}
-            {!activeSpec.usdt && customTokens.length === 0 && (
+            {activeSpec.tetherTokens.length === 0 && customTokens.length === 0 && (
               <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
                 No tokens registered for {activeConfig.label}{" "}
                 {NETWORK_LABEL[handle.network].toLowerCase()} yet. Switch to{" "}
@@ -421,11 +493,8 @@ export default function WalletPage() {
                   className="underline underline-offset-2 hover:text-foreground"
                 >
                   {handle.network === "mainnet" ? "Testnet" : "Mainnet"}
-                </button>
-                {handle.network === "mainnet"
-                  ? " for a test deployment, or click "
-                  : " for the live USDT contract, or click "}
-                <strong>Add token</strong> to import any other contract.
+                </button>{" "}
+                or click <strong>Add token</strong> to import any contract.
               </p>
             )}
           </Card>
@@ -441,6 +510,7 @@ function TokenRow({
   name,
   balance,
   decimals,
+  usdValue,
   hidden,
   onRemove,
 }: {
@@ -449,6 +519,7 @@ function TokenRow({
   name: string;
   balance: bigint | null;
   decimals: number;
+  usdValue: number | null;
   hidden: boolean;
   onRemove?: () => void;
 }) {
@@ -474,9 +545,14 @@ function TokenRow({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <p className="font-mono text-sm">
-          {hidden ? "••••" : balance == null ? "—" : formatBalance(balance, decimals)}
-        </p>
+        <div className="text-right">
+          <p className="font-mono text-sm">
+            {hidden ? "••••" : balance == null ? "—" : formatBalance(balance, decimals)}
+          </p>
+          {!hidden && usdValue != null && (
+            <p className="text-[11px] text-zinc-500">{formatUsd(usdValue)}</p>
+          )}
+        </div>
         {onRemove && (
           <button
             type="button"

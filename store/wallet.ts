@@ -21,19 +21,20 @@ import {
 import { closeWallet, type WalletHandle } from "@/lib/wdk-client";
 
 type ChainBigint = Partial<Record<ChainId, bigint | null>>;
+type ChainTokens = Partial<Record<ChainId, Record<string, bigint>>>;
 
 export interface WalletState {
   handle: WalletHandle | null;
   /** Which chain the UI is currently focused on. */
   activeChain: ChainId;
-  /** Which network the wallet is bound to (applies to all chains). The
-   *  handle.network and this should stay in sync — when they diverge the
-   *  UI should treat the handle's network as the truth and re-derive. */
+  /** Which network the wallet is bound to (applies to all chains). */
   activeNetwork: NetworkKey;
   /** Native balance per chain (chain-native smallest units). */
   nativeBalances: ChainBigint;
-  /** USDT balance per chain (in 6-decimal smallest units when USDT is configured). */
-  usdtBalances: ChainBigint;
+  /** Tether token balances per chain, keyed by token contract/mint address. */
+  tetherBalances: ChainTokens;
+  /** USD prices keyed by CoinGecko asset id. */
+  prices: Record<string, number>;
   /** Hide every balance numeric value from screen — persisted preference. */
   balanceHidden: boolean;
   status: "idle" | "loading" | "ready" | "error";
@@ -43,11 +44,11 @@ export interface WalletState {
   setActiveChain: (chain: ChainId) => void;
   setActiveNetwork: (network: NetworkKey) => void;
   setNativeBalance: (chain: ChainId, balance: bigint | null) => void;
-  setUsdtBalance: (chain: ChainId, balance: bigint | null) => void;
   setAllBalances: (
     natives: Partial<Record<ChainId, bigint>>,
-    usdts: Partial<Record<ChainId, bigint>>,
+    tethers: Partial<Record<ChainId, Record<string, bigint>>>,
   ) => void;
+  setPrices: (prices: Record<string, number>) => void;
   clearBalances: () => void;
   setBalanceHidden: (hidden: boolean) => void;
   toggleBalanceHidden: () => void;
@@ -89,7 +90,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   activeChain: DEFAULT_CHAIN,
   activeNetwork: loadNetwork(),
   nativeBalances: emptyChainMap(),
-  usdtBalances: emptyChainMap(),
+  tetherBalances: {},
+  prices: {},
   balanceHidden: loadBalanceHidden(),
   status: "idle",
   error: null,
@@ -102,17 +104,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
   setNativeBalance: (chain, balance) =>
     set((s) => ({ nativeBalances: { ...s.nativeBalances, [chain]: balance } })),
-  setUsdtBalance: (chain, balance) =>
-    set((s) => ({ usdtBalances: { ...s.usdtBalances, [chain]: balance } })),
-  setAllBalances: (natives, usdts) =>
+  setAllBalances: (natives, tethers) =>
     set((s) => ({
       nativeBalances: { ...s.nativeBalances, ...natives },
-      usdtBalances: { ...s.usdtBalances, ...usdts },
+      tetherBalances: { ...s.tetherBalances, ...tethers },
     })),
+  setPrices: (prices) => set({ prices }),
   clearBalances: () =>
     set({
       nativeBalances: emptyChainMap(),
-      usdtBalances: emptyChainMap(),
+      tetherBalances: {},
     }),
   setBalanceHidden: (hidden) => {
     persistBalanceHidden(hidden);
@@ -129,7 +130,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     set({
       handle: null,
       nativeBalances: emptyChainMap(),
-      usdtBalances: emptyChainMap(),
+      tetherBalances: {},
       status: "idle",
       error: null,
     });

@@ -85,6 +85,9 @@ export async function openWallet(
   // packages, so we cast at the registration boundary. Safe at runtime — the
   // orchestrator only invokes the shared public surface.
   /* eslint-disable @typescript-eslint/no-explicit-any */
+  // WalletManagerEvm is reused for every EVM-compatible chain — we register
+  // it once per chain id with the corresponding RPC. The orchestrator keeps
+  // them as independent wallets so balances and signing stay scoped.
   const wdk = new WdkManager(seedPhrase)
     .registerWallet("solana", WalletManagerSolana as any, {
       provider: networkSpec("solana", network).rpcUrl,
@@ -98,6 +101,9 @@ export async function openWallet(
     })
     .registerWallet("evm", WalletManagerEvm as any, {
       provider: networkSpec("evm", network).rpcUrl,
+    })
+    .registerWallet("bsc", WalletManagerEvm as any, {
+      provider: networkSpec("bsc", network).rpcUrl,
     });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -153,17 +159,6 @@ export async function getNativeBalance(
   return coerceBigInt(await account.getBalance());
 }
 
-/** Fetch the USDT balance for a chain on the wallet's active network. Returns
- *  0n if no USDT contract is configured for that chain × network. */
-export async function getUsdtBalance(
-  handle: WalletHandle,
-  chain: ChainId,
-): Promise<bigint> {
-  const spec = networkSpec(chain, handle.network);
-  if (!spec.usdt) return 0n;
-  return getTokenBalance(handle, chain, spec.usdt.address);
-}
-
 /** Fetch the balance of any token by mint / contract address on a chain. */
 export async function getTokenBalance(
   handle: WalletHandle,
@@ -177,6 +172,25 @@ export async function getTokenBalance(
   } catch {
     return 0n;
   }
+}
+
+/** Fetch every canonical Tether token balance for a chain on the active
+ *  network. Returns an empty object when no tokens are configured. */
+export async function getTetherTokenBalances(
+  handle: WalletHandle,
+  chain: ChainId,
+): Promise<Record<string, bigint>> {
+  const spec = networkSpec(chain, handle.network);
+  if (spec.tetherTokens.length === 0) return {};
+  const entries = await Promise.all(
+    spec.tetherTokens.map(async (t) => {
+      const bal = await getTokenBalance(handle, chain, t.address).catch(
+        () => 0n,
+      );
+      return [t.address, bal] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
 }
 
 export interface SendQuote {
