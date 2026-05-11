@@ -18,6 +18,7 @@ export default function CreateWalletPage() {
   const router = useRouter();
   const setHandle = useWalletStore((s) => s.setHandle);
   const setStatus = useWalletStore((s) => s.setStatus);
+  const activeNetwork = useWalletStore((s) => s.activeNetwork);
 
   const [step, setStep] = useState<Step>("password");
   const [password, setPassword] = useState("");
@@ -59,7 +60,7 @@ export default function CreateWalletPage() {
     setStatus("loading");
     try {
       await saveVault(seedPhrase, password);
-      const handle = await openWallet(seedPhrase);
+      const handle = await openWallet(seedPhrase, activeNetwork);
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");

@@ -8,20 +8,26 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  History,
   Lock,
   RefreshCcw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Dropdown } from "@/components/ui/dropdown";
 import {
   CHAIN_CONFIGS,
   CHAIN_IDS,
+  NETWORK_LABEL,
   type ChainId,
+  type NetworkKey,
+  networkSpec,
 } from "@/lib/chains";
 import {
   getNativeBalance,
   getUsdtBalance,
+  switchNetwork,
   type WalletHandle,
 } from "@/lib/wdk-client";
 import { hasVault } from "@/lib/storage";
@@ -33,14 +39,19 @@ export default function WalletPage() {
   const handle = useWalletStore((s) => s.handle);
   const activeChain = useWalletStore((s) => s.activeChain);
   const setActiveChain = useWalletStore((s) => s.setActiveChain);
+  const activeNetwork = useWalletStore((s) => s.activeNetwork);
+  const setActiveNetwork = useWalletStore((s) => s.setActiveNetwork);
+  const setHandle = useWalletStore((s) => s.setHandle);
   const nativeBalances = useWalletStore((s) => s.nativeBalances);
   const usdtBalances = useWalletStore((s) => s.usdtBalances);
   const setAllBalances = useWalletStore((s) => s.setAllBalances);
+  const clearBalances = useWalletStore((s) => s.clearBalances);
   const balanceHidden = useWalletStore((s) => s.balanceHidden);
   const toggleBalanceHidden = useWalletStore((s) => s.toggleBalanceHidden);
   const reset = useWalletStore((s) => s.reset);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [switchingNetwork, setSwitchingNetwork] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -49,38 +60,59 @@ export default function WalletPage() {
     }
   }, [handle, router]);
 
-  const refreshBalances = useCallback(async (h: WalletHandle) => {
-    setRefreshing(true);
-    try {
-      // Fan out across every registered chain in parallel. Each pair
-      // (native + usdt) within a chain also resolves in parallel.
-      const results = await Promise.all(
-        CHAIN_IDS.map(async (chain) => {
-          const [native, usdt] = await Promise.all([
-            getNativeBalance(h, chain).catch(() => 0n),
-            getUsdtBalance(h, chain).catch(() => 0n),
-          ]);
-          return [chain, native, usdt] as const;
-        }),
-      );
-      const natives: Partial<Record<ChainId, bigint>> = {};
-      const usdts: Partial<Record<ChainId, bigint>> = {};
-      for (const [chain, native, usdt] of results) {
-        natives[chain] = native;
-        usdts[chain] = usdt;
+  const refreshBalances = useCallback(
+    async (h: WalletHandle) => {
+      setRefreshing(true);
+      try {
+        const results = await Promise.all(
+          CHAIN_IDS.map(async (chain) => {
+            const [native, usdt] = await Promise.all([
+              getNativeBalance(h, chain).catch(() => 0n),
+              getUsdtBalance(h, chain).catch(() => 0n),
+            ]);
+            return [chain, native, usdt] as const;
+          }),
+        );
+        const natives: Partial<Record<ChainId, bigint>> = {};
+        const usdts: Partial<Record<ChainId, bigint>> = {};
+        for (const [chain, native, usdt] of results) {
+          natives[chain] = native;
+          usdts[chain] = usdt;
+        }
+        setAllBalances(natives, usdts);
+      } finally {
+        setRefreshing(false);
       }
-      setAllBalances(natives, usdts);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [setAllBalances]);
+    },
+    [setAllBalances],
+  );
 
-  // Initial fetch on first mount with a live handle.
+  // Initial balance fetch when the wallet first loads.
   useEffect(() => {
     if (handle) {
       void refreshBalances(handle);
     }
   }, [handle, refreshBalances]);
+
+  const handleNetworkChange = useCallback(
+    async (next: NetworkKey) => {
+      if (!handle || next === handle.network) return;
+      setSwitchingNetwork(true);
+      try {
+        clearBalances();
+        const newHandle = await switchNetwork(handle, next);
+        setHandle(newHandle);
+        setActiveNetwork(next);
+        // Balances will be refetched by the effect below once the new
+        // handle is in the store.
+      } catch (err) {
+        console.error("Failed to switch network:", err);
+      } finally {
+        setSwitchingNetwork(false);
+      }
+    },
+    [handle, clearBalances, setHandle, setActiveNetwork],
+  );
 
   if (!handle) {
     return (
@@ -92,6 +124,7 @@ export default function WalletPage() {
 
   const activeAccount = handle.accounts[activeChain];
   const activeConfig = CHAIN_CONFIGS[activeChain];
+  const activeSpec = networkSpec(activeChain, handle.network);
   const nativeBalance = nativeBalances[activeChain] ?? null;
   const usdtBalance = usdtBalances[activeChain] ?? null;
 
@@ -114,12 +147,57 @@ export default function WalletPage() {
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
       <div className="w-full max-w-xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium dark:border-zinc-800 dark:bg-zinc-950">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            {activeConfig.isTestnet ? "Testnet · " : ""}
-            {activeConfig.label}
+        {/* Top bar: chain selector + network selector + lock */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Dropdown
+              ariaLabel="Select chain"
+              value={activeChain}
+              onChange={(v) => setActiveChain(v as ChainId)}
+              items={CHAIN_IDS.map((chain) => {
+                const c = CHAIN_CONFIGS[chain];
+                const hasAcc = Boolean(handle.accounts[chain]);
+                const bal = nativeBalances[chain];
+                return {
+                  value: chain,
+                  label: c.label,
+                  sublabel: c.shortLabel,
+                  leading: <ChainBadge chain={chain} />,
+                  trailing: hasAcc && bal != null && !balanceHidden
+                    ? `${formatBalance(bal, c.nativeDecimals)} ${c.nativeSymbol}`
+                    : undefined,
+                  disabled: !hasAcc,
+                };
+              })}
+              triggerLeading={<ChainBadge chain={activeChain} />}
+            />
+            <Dropdown
+              ariaLabel="Select network"
+              value={handle.network}
+              onChange={(v) => void handleNetworkChange(v as NetworkKey)}
+              items={[
+                {
+                  value: "mainnet",
+                  label: "Mainnet",
+                  sublabel: "Live assets",
+                  leading: <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />,
+                },
+                {
+                  value: "testnet",
+                  label: "Testnet",
+                  sublabel: "Faucet funds only",
+                  leading: <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />,
+                },
+              ]}
+              triggerLeading={
+                <span
+                  className={cn(
+                    "inline-block h-1.5 w-1.5 rounded-full",
+                    handle.network === "mainnet" ? "bg-emerald-500" : "bg-amber-500",
+                  )}
+                />
+              }
+            />
           </div>
           <Button
             variant="ghost"
@@ -131,42 +209,19 @@ export default function WalletPage() {
           </Button>
         </div>
 
-        {/* Chain switcher */}
-        <div
-          className="grid gap-1.5 rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950"
-          style={{ gridTemplateColumns: `repeat(${CHAIN_IDS.length}, minmax(0, 1fr))` }}
-        >
-          {CHAIN_IDS.map((chain) => {
-            const c = CHAIN_CONFIGS[chain];
-            const isActive = chain === activeChain;
-            const hasAccount = Boolean(handle.accounts[chain]);
-            return (
-              <button
-                key={chain}
-                type="button"
-                onClick={() => setActiveChain(chain)}
-                disabled={!hasAccount}
-                className={cn(
-                  "rounded-lg px-2 py-2 text-xs font-medium transition-all",
-                  isActive
-                    ? "bg-foreground text-background shadow-sm"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900",
-                  !hasAccount && "opacity-30 cursor-not-allowed",
-                )}
-              >
-                <span className="block">{c.shortLabel}</span>
-                <span className="block text-[10px] font-normal opacity-60">
-                  {c.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {switchingNetwork && (
+          <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
+            Re-binding wallet to {NETWORK_LABEL[handle.network === "mainnet" ? "testnet" : "mainnet"]}…
+          </div>
+        )}
 
         {/* Active chain account card */}
         {activeAccount ? (
           <Card>
-            <CardDescription>Account · {activeConfig.label}</CardDescription>
+            <CardDescription>
+              {activeConfig.label} · {NETWORK_LABEL[handle.network]}
+            </CardDescription>
             <div className="mt-2 flex items-center justify-between gap-3">
               <CardTitle className="font-mono text-lg break-all">
                 {truncate(activeAccount.address, 6, 6)}
@@ -180,7 +235,7 @@ export default function WalletPage() {
                   <Copy size={14} />
                 </button>
                 <a
-                  href={activeConfig.addressExplorer(activeAccount.address)}
+                  href={activeSpec.addressExplorer(activeAccount.address)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="View on explorer"
@@ -236,14 +291,14 @@ export default function WalletPage() {
             <CardTitle>Account unavailable</CardTitle>
             <CardDescription className="mt-2">
               The {activeConfig.label} RPC was unreachable when this wallet
-              was opened. Lock and unlock the wallet to retry derivation.
+              was opened. Lock and unlock to retry derivation.
             </CardDescription>
           </Card>
         )}
 
         {/* Primary actions */}
         {activeAccount && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Link
               href="/wallet/send"
               className={cn(
@@ -260,19 +315,27 @@ export default function WalletPage() {
             >
               Receive
             </Link>
+            <Link
+              href="/wallet/history"
+              className={cn(
+                "flex h-12 items-center justify-center gap-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium transition-all hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
+              )}
+            >
+              <History size={14} /> History
+            </Link>
           </div>
         )}
 
-        {/* USDT card (when configured for this chain) */}
-        {activeConfig.usdt && activeAccount && (
+        {/* USDT card — only render when the active chain × network has USDT */}
+        {activeAccount && activeSpec.usdt && (
           <Card>
             <CardDescription>Tokens</CardDescription>
             <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-zinc-100 px-3 py-3 dark:border-zinc-800">
               <div className="flex items-center gap-3">
-                {activeConfig.usdt.logo ? (
+                {activeSpec.usdt.logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={activeConfig.usdt.logo}
+                    src={activeSpec.usdt.logo}
                     alt="USDT"
                     className="h-9 w-9 rounded-full bg-zinc-100 object-contain p-1 dark:bg-zinc-900"
                     loading="lazy"
@@ -294,11 +357,11 @@ export default function WalletPage() {
                   ? "••••"
                   : usdtBalance == null
                     ? "—"
-                    : formatBalance(usdtBalance, activeConfig.usdt.decimals)}
+                    : formatBalance(usdtBalance, activeSpec.usdt.decimals)}
               </p>
             </div>
             <p className="mt-3 text-[11px] text-zinc-500">
-              SPL/jetton/TRC-20/ERC-20 transfer flows ship next. Add more
+              SPL / jetton / TRC-20 / ERC-20 transfer flows ship next. Add more
               tokens in{" "}
               <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
                 lib/chains.ts
@@ -308,25 +371,41 @@ export default function WalletPage() {
           </Card>
         )}
 
-        {!activeConfig.usdt && activeAccount && (
+        {/* When no USDT is configured for this chain × network, show a
+            constructive hint instead of an empty section. */}
+        {activeAccount && !activeSpec.usdt && (
           <Card>
             <CardDescription>Tokens</CardDescription>
             <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              No USDT contract configured for {activeConfig.label}{" "}
-              {activeConfig.isTestnet ? "testnet" : "mainnet"}. Set the
-              relevant{" "}
+              No USDT contract is registered for {activeConfig.label}{" "}
+              {NETWORK_LABEL[handle.network].toLowerCase()}. Switch to{" "}
+              <button
+                onClick={() => void handleNetworkChange(handle.network === "mainnet" ? "testnet" : "mainnet")}
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                {handle.network === "mainnet" ? "Testnet" : "Mainnet"}
+              </button>
+              {handle.network === "mainnet"
+                ? " for a test deployment, or "
+                : " for the live USDT contract, or "}
+              point{" "}
               <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
-                NEXT_PUBLIC_*_USDT_*
+                NEXT_PUBLIC_{activeConfig.id.toUpperCase()}_USDT_{handle.network.toUpperCase()}
               </code>{" "}
-              environment variable in{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
-                lib/chains.ts
-              </code>{" "}
-              to enable.
+              at your own deployment.
             </p>
           </Card>
         )}
       </div>
     </main>
+  );
+}
+
+function ChainBadge({ chain }: { chain: ChainId }) {
+  const c = CHAIN_CONFIGS[chain];
+  return (
+    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+      {c.shortLabel.slice(0, 3)}
+    </span>
   );
 }

@@ -2,19 +2,26 @@
  * Multi-chain wallet adapter for the Tether WDK.
  *
  * Architecture note: WDK is a self-custodial wallet kit. The seed phrase is
- * the master secret. This module is the ONLY place that touches the seed in
- * cleartext form — every other module operates on a `WalletHandle` (which
- * carries one derived account per chain) and never sees the raw secret.
+ * the master secret. We store it inside the WalletHandle while the wallet is
+ * unlocked so the user can flip between mainnet and testnet without being
+ * forced to re-enter their password. On lock, `closeWallet` disposes the WDK
+ * orchestrator and drops the WalletHandle entirely (the seed reference goes
+ * out of scope and is eligible for GC).
  *
- * Browser context: every chain module is dynamically imported inside
- * `openWallet()` so heavyweight crypto stays out of the SSR bundle. The
- * `next.config.ts` aliases swap the Solana module's `sodium-native` dep for
- * the pure-JS `sodium-javascript` build at bundle time.
+ * Browser context: each chain manager is dynamically imported the first time
+ * a wallet is opened. The Solana module's `sodium-native` dep is aliased to
+ * `sodium-javascript` at bundle time via `next.config.ts`.
  */
 
 import type WdkManager from "@tetherto/wdk";
 
-import { CHAIN_CONFIGS, CHAIN_IDS, type ChainId } from "./chains";
+import {
+  CHAIN_CONFIGS,
+  CHAIN_IDS,
+  type ChainId,
+  type NetworkKey,
+  networkSpec,
+} from "./chains";
 
 /** Generic account handle — we type it loosely because each chain module
  *  returns a slightly different concrete class. Operations that need the
@@ -36,22 +43,29 @@ export interface AccountHandle {
 }
 
 export interface WalletHandle {
+  /** Master secret. Kept in-memory so network switches don't force a
+   *  password re-entry. Wiped by closeWallet(). */
+  seedPhrase: string;
   /** WDK orchestrator — keep alive until logout, then `dispose()`. */
   wdk: WdkManager;
   /** Derived account #0 per chain. */
   accounts: Record<ChainId, AccountHandle>;
+  /** Network the whole wallet is currently bound to. */
+  network: NetworkKey;
 }
 
 /**
  * Initialize a multi-chain wallet from a BIP-39 seed phrase.
  *
- * Registers every supported chain on the WDK orchestrator and derives the
- * default account on each. The caller should let the cleartext seed go out
- * of scope immediately after this returns.
+ * Registers every supported chain on a single WDK orchestrator and derives
+ * the default account on each. Failed derivations on individual chains are
+ * non-fatal — the rest of the wallet stays usable.
  */
-export async function openWallet(seedPhrase: string): Promise<WalletHandle> {
-  // Lazy-import everything so the SSR bundle stays slim. We do them in
-  // parallel because they have no shared mutable state at import time.
+export async function openWallet(
+  seedPhrase: string,
+  network: NetworkKey,
+): Promise<WalletHandle> {
+  // Lazy-import everything in parallel so the SSR bundle stays slim.
   const [
     { default: WdkManager },
     { default: WalletManagerSolana },
@@ -67,29 +81,26 @@ export async function openWallet(seedPhrase: string): Promise<WalletHandle> {
   ]);
 
   // Each chain manager is a concrete subclass of WDK's abstract WalletManager.
-  // TypeScript can't reconcile their private-field declarations across packages,
-  // so we cast at the registration boundary. Safe at runtime — these are all
-  // genuine WalletManager subclasses, and the orchestrator only invokes the
-  // shared public surface.
+  // TypeScript can't reconcile their private-field declarations across
+  // packages, so we cast at the registration boundary. Safe at runtime — the
+  // orchestrator only invokes the shared public surface.
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const wdk = new WdkManager(seedPhrase)
     .registerWallet("solana", WalletManagerSolana as any, {
-      provider: CHAIN_CONFIGS.solana.rpcUrl,
+      provider: networkSpec("solana", network).rpcUrl,
       commitment: "confirmed",
     })
     .registerWallet("tron", WalletManagerTron as any, {
-      provider: CHAIN_CONFIGS.tron.rpcUrl,
+      provider: networkSpec("tron", network).rpcUrl,
     })
     .registerWallet("ton", WalletManagerTon as any, {
-      tonClient: { url: CHAIN_CONFIGS.ton.rpcUrl },
+      tonClient: { url: networkSpec("ton", network).rpcUrl },
     })
     .registerWallet("evm", WalletManagerEvm as any, {
-      provider: CHAIN_CONFIGS.evm.rpcUrl,
+      provider: networkSpec("evm", network).rpcUrl,
     });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  // Derive account #0 on every chain in parallel. If one chain's RPC is
-  // momentarily flaky we still want addresses for the others — fail-soft.
   const accounts = {} as Record<ChainId, AccountHandle>;
   await Promise.all(
     CHAIN_IDS.map(async (chain) => {
@@ -99,14 +110,28 @@ export async function openWallet(seedPhrase: string): Promise<WalletHandle> {
         const address = typeof addrResult === "string" ? addrResult : String(addrResult);
         accounts[chain] = { chain, address, account };
       } catch (err) {
-        // Surface the failure but don't tear the whole wallet down — the
-        // user can still operate on the chains that succeeded.
         console.warn(`Failed to derive account for ${chain}:`, err);
       }
     }),
   );
 
-  return { wdk, accounts };
+  return { seedPhrase, wdk, accounts, network };
+}
+
+/**
+ * Re-open the wallet on a different network. Disposes the current WDK and
+ * spins up a fresh one bound to the new RPCs. Re-derives every account.
+ *
+ * The new WalletHandle replaces the old one in the store; the caller is
+ * responsible for the swap.
+ */
+export async function switchNetwork(
+  handle: WalletHandle,
+  network: NetworkKey,
+): Promise<WalletHandle> {
+  if (handle.network === network) return handle;
+  closeWallet(handle);
+  return openWallet(handle.seedPhrase, network);
 }
 
 /** Release every chain's in-memory keys. Always call when "logging out". */
@@ -128,24 +153,24 @@ export async function getNativeBalance(
   return coerceBigInt(await account.getBalance());
 }
 
-/** Fetch the USDT balance for a chain (returns 0n if no USDT config on this network). */
+/** Fetch the USDT balance for a chain on the wallet's active network. Returns
+ *  0n if no USDT contract is configured for that chain × network. */
 export async function getUsdtBalance(
   handle: WalletHandle,
   chain: ChainId,
 ): Promise<bigint> {
-  const cfg = CHAIN_CONFIGS[chain];
-  if (!cfg.usdt) return 0n;
+  const spec = networkSpec(chain, handle.network);
+  if (!spec.usdt) return 0n;
   const account = handle.accounts[chain]?.account;
   if (!account?.getTokenBalance) return 0n;
   try {
-    return coerceBigInt(await account.getTokenBalance(cfg.usdt.address));
+    return coerceBigInt(await account.getTokenBalance(spec.usdt.address));
   } catch {
     return 0n;
   }
 }
 
 export interface SendQuote {
-  /** Native fee in the chain's smallest unit. */
   fee: bigint;
 }
 
@@ -154,11 +179,7 @@ export interface SendResult {
   fee: bigint;
 }
 
-/**
- * Estimate the fee for sending the chain's native asset to `recipient`.
- * Only Solana exposes a stable `quoteSendTransaction` in WDK beta today;
- * other chains return a 0 quote and we let the user proceed.
- */
+/** Estimate the native send fee for a chain. */
 export async function quoteNativeSend(
   handle: WalletHandle,
   chain: ChainId,
@@ -174,8 +195,6 @@ export async function quoteNativeSend(
     })) as { fee?: unknown };
     return { fee: coerceBigInt(result?.fee) };
   } catch {
-    // Quote endpoints can be flaky on testnets — fall through to a zero
-    // estimate rather than blocking the send flow.
     return { fee: 0n };
   }
 }
@@ -219,18 +238,61 @@ export function isLikelyAddressFor(chain: ChainId, value: string): boolean {
   if (!v) return false;
   switch (chain) {
     case "solana":
-      // base58, 32-44 chars
       return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v);
     case "tron":
-      // base58, always starts with T, 34 chars
       return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(v);
     case "ton":
-      // Either user-friendly (48 chars base64url-ish) or raw (0:hex...)
       return /^[A-Za-z0-9_-]{48}$/.test(v) || /^-?\d+:[0-9a-fA-F]{64}$/.test(v);
     case "evm":
-      // 0x-prefixed 20-byte hex
       return /^0x[0-9a-fA-F]{40}$/.test(v);
     default:
       return false;
+  }
+}
+
+/**
+ * Fetch recent transaction signatures for the active Solana account, with
+ * basic metadata. Implemented directly against the Solana JSON-RPC because
+ * the WDK Solana module only exposes per-signature receipt lookups, not a
+ * list endpoint.
+ */
+export interface SolanaTxSummary {
+  signature: string;
+  slot: number;
+  blockTime: number | null;
+  err: unknown | null;
+}
+
+export async function getSolanaRecentTransactions(
+  handle: WalletHandle,
+  limit: number = 10,
+): Promise<SolanaTxSummary[]> {
+  const account = handle.accounts.solana;
+  if (!account) return [];
+  const rpcUrl = networkSpec("solana", handle.network).rpcUrl;
+  const body = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "getSignaturesForAddress",
+    params: [account.address, { limit }],
+  };
+  try {
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      result?: Array<{
+        signature: string;
+        slot: number;
+        blockTime: number | null;
+        err: unknown | null;
+      }>;
+    };
+    return data.result ?? [];
+  } catch {
+    return [];
   }
 }

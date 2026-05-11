@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CHAIN_CONFIGS } from "@/lib/chains";
+import { CHAIN_CONFIGS, NETWORK_LABEL, networkSpec } from "@/lib/chains";
 import { hasVault } from "@/lib/storage";
 import { cn, formatBalance, truncate } from "@/lib/utils";
 import {
@@ -75,6 +75,8 @@ export default function SendPage() {
 
   const activeAccount = handle?.accounts[activeChain];
   const config = CHAIN_CONFIGS[activeChain];
+  const network = handle?.network ?? "testnet";
+  const spec = networkSpec(activeChain, network);
 
   const amountUnits = useMemo(
     () => parseAmount(amount, config.nativeDecimals),
@@ -161,8 +163,10 @@ export default function SendPage() {
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Sending on{" "}
-            <span className="font-medium text-foreground">{config.label}</span>
-            {config.isTestnet ? " testnet" : ""} · Balance{" "}
+            <span className="font-medium text-foreground">
+              {config.label} {NETWORK_LABEL[network]}
+            </span>{" "}
+            · Balance{" "}
             <span className="font-mono font-medium text-foreground">
               {formatBalance(balance, config.nativeDecimals)} {config.nativeSymbol}
             </span>
@@ -246,8 +250,7 @@ export default function SendPage() {
                 label="Chain"
                 value={
                   <span className="font-medium">
-                    {config.label}
-                    {config.isTestnet ? " (testnet)" : ""}
+                    {config.label} {NETWORK_LABEL[network]}
                   </span>
                 }
               />
@@ -349,7 +352,7 @@ export default function SendPage() {
             </CardDescription>
 
             <a
-              href={config.txExplorer(signature)}
+              href={spec.txExplorer(signature)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-mono hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"

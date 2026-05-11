@@ -16,6 +16,7 @@ export default function UnlockPage() {
   const router = useRouter();
   const setHandle = useWalletStore((s) => s.setHandle);
   const setStatus = useWalletStore((s) => s.setStatus);
+  const activeNetwork = useWalletStore((s) => s.activeNetwork);
 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -38,7 +39,7 @@ export default function UnlockPage() {
     setStatus("loading");
     try {
       const seed = await unlockVault(password);
-      const handle = await openWallet(seed);
+      const handle = await openWallet(seed, activeNetwork);
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");

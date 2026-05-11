@@ -7,7 +7,7 @@ import { ArrowLeft, Check, Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { CHAIN_CONFIGS } from "@/lib/chains";
+import { CHAIN_CONFIGS, NETWORK_LABEL } from "@/lib/chains";
 import { hasVault } from "@/lib/storage";
 import { useWalletStore } from "@/store/wallet";
 
@@ -26,6 +26,7 @@ export default function ReceivePage() {
 
   const activeAccount = handle?.accounts[activeChain];
   const config = CHAIN_CONFIGS[activeChain];
+  const network = handle?.network ?? "testnet";
 
   async function copyAddress() {
     if (!activeAccount) return;
@@ -62,8 +63,9 @@ export default function ReceivePage() {
           <h1 className="text-3xl font-semibold tracking-tight">Receive</h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Scan the QR or copy the address below to receive on{" "}
-            <span className="font-medium text-foreground">{config.label}</span>
-            {config.isTestnet ? " testnet." : "."}
+            <span className="font-medium text-foreground">
+              {config.label} {NETWORK_LABEL[network]}
+            </span>.
           </p>
         </header>
 

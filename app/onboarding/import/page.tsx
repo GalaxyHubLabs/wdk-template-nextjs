@@ -18,6 +18,7 @@ export default function ImportWalletPage() {
   const router = useRouter();
   const setHandle = useWalletStore((s) => s.setHandle);
   const setStatus = useWalletStore((s) => s.setStatus);
+  const activeNetwork = useWalletStore((s) => s.activeNetwork);
 
   const [wordCount, setWordCount] = useState<WordCount>(12);
   const [words, setWords] = useState<string[]>(() => Array.from({ length: 12 }, () => ""));
@@ -105,7 +106,7 @@ export default function ImportWalletPage() {
     setStatus("loading");
     try {
       await saveVault(phrase, password);
-      const handle = await openWallet(phrase);
+      const handle = await openWallet(phrase, activeNetwork);
       setHandle(handle);
       setStatus("ready");
       router.push("/wallet");
