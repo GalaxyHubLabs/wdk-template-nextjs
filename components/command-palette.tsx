@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   BookUser,
   History,
@@ -168,6 +169,14 @@ export function CommandPalette() {
           Icon: ShieldOff,
           keywords: "revoke allowance erc20 dex",
           run: go("/wallet/approvals"),
+        },
+        {
+          id: "swap",
+          label: "Swap tokens",
+          description: "Powered by Tether's WDK Velora protocol module (EVM)",
+          Icon: ArrowLeftRight,
+          keywords: "trade exchange velora paraswap dex",
+          run: go("/wallet/swap"),
         },
         {
           id: "add-token",

@@ -87,6 +87,10 @@ The same `WalletManagerEvm` is registered under five different chain ids with di
 - **Auto-lock** — Settings → Privacy preset selector (Off / 5 / 15 / 30 / 60 min). Mouse, keyboard, touch, scroll, and visibility-state events all count as activity.
 - **Hide-balances toggle** — global `••••` masking, persisted per device.
 
+### DeFi
+
+- **Swap tokens** (`/wallet/swap`) — quotes and executes EVM-chain swaps through [`@tetherto/wdk-protocol-swap-velora-evm`](https://www.npmjs.com/package/@tetherto/wdk-protocol-swap-velora-evm), Tether's official WDK module for the Velora (ex-ParaSwap) aggregator. Works on every EVM-family chain the template supports, with a clean "approve once → quote → confirm" flow.
+
 ### NFTs
 
 - **Solana collectibles** (`/wallet/collectibles`) — Metaplex DAS via `getAssetsByOwner` on the configured RPC. Graceful degradation with an in-app CTA to plug a DAS-capable provider.
@@ -357,6 +361,7 @@ app/
   wallet/history/page.tsx        Unified activity feed (Solana + EVM family)
   wallet/sign/page.tsx           Arbitrary-message signing
   wallet/approvals/page.tsx      ERC-20 approval explorer + revoker
+  wallet/swap/page.tsx           Velora swap (EVM family) via @tetherto/wdk-protocol-swap-velora-evm
   wallet/collectibles/page.tsx   Solana NFTs via Metaplex DAS
   wallet/addresses/page.tsx      Address book with ENS / SNS resolution
   wallet/tokens/add/page.tsx     Custom token import + Jupiter auto-fetch (Solana)
@@ -448,7 +453,10 @@ Features the template architecture is ready for but does not yet ship:
 - **WalletConnect v2** so the template can act as the wallet side of any dApp.
 - **Hardware wallet** signing (Ledger via WebHID).
 - **Private key import** as a fifth account type.
-- **Cross-chain swap** (Jupiter on Solana, LI.FI / Across for EVM ↔ EVM).
+- **Solana swap** (Jupiter aggregator) — companion to the existing EVM swap which already ships via `@tetherto/wdk-protocol-swap-velora-evm`.
+- **Cross-chain bridge** via `@tetherto/wdk-protocol-bridge-usdt0-evm` — wire the WDK module already published on npm.
+- **Lending positions** via `@tetherto/wdk-protocol-lending-aave-evm` — read + supply / withdraw flows around the Aave protocol module.
+- **Fiat onramp** via `@tetherto/wdk-protocol-fiat-moonpay` — official Tether WDK module for MoonPay.
 - **EVM NFT listing** (ERC-721 / ERC-1155 collectibles, mirroring the Solana DAS implementation).
 - **TRC-20 and jetton balances in the watch-only view** (currently link out to the chain explorer).
 

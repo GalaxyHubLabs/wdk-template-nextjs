@@ -599,6 +599,152 @@ export async function setApproval(
   return { signature, fee: coerceBigInt(result?.fee) };
 }
 
+// ─── Velora swap (EVM family) ─────────────────────────────────────────
+
+export type SwapDirection = "sell" | "buy";
+
+export interface SwapQuote {
+  /** Amount sold in tokenIn-smallest units. Identical to the input
+   *  when the user picked a "sell exactly" trade, derived when they
+   *  picked a "buy exactly" trade. */
+  tokenInAmount: bigint;
+  /** Amount received in tokenOut-smallest units. */
+  tokenOutAmount: bigint;
+  /** Native-asset gas cost for the swap. */
+  fee: bigint;
+}
+
+export interface SwapResult extends SwapQuote {
+  /** Transaction hash on the underlying chain. */
+  signature: string;
+}
+
+/** Chains the Velora swap protocol can target through this template.
+ *  Mirrors the EVM-family check in `chainSupportsApprovals`. */
+function chainSupportsSwap(chain: ChainId): boolean {
+  return (
+    chain === "evm" ||
+    chain === "bsc" ||
+    chain === "polygon" ||
+    chain === "arbitrum" ||
+    chain === "base" ||
+    chain === "optimism"
+  );
+}
+
+export function isSwapSupported(chain: ChainId): boolean {
+  return chainSupportsSwap(chain);
+}
+
+/**
+ * Quote the cost of swapping `tokenInAmount` of `tokenIn` for `tokenOut`
+ * (sell mode), or the cost of acquiring `tokenOutAmount` of `tokenOut`
+ * paying `tokenIn` (buy mode). Uses Tether's WDK Velora protocol
+ * module — the same SDK that drives the wallet's transfer surface,
+ * just configured for swap.
+ */
+export async function quoteSwap(
+  handle: WalletHandle,
+  chain: ChainId,
+  options: {
+    tokenIn: string;
+    tokenOut: string;
+    amount: bigint;
+    direction: SwapDirection;
+  },
+): Promise<SwapQuote> {
+  if (!chainSupportsSwap(chain)) {
+    throw new Error(`Swap is only available on EVM chains in this template.`);
+  }
+  const account = handle.accounts[chain]?.account;
+  if (!account) throw new Error(`No ${chain} account derived.`);
+  const { default: VeloraProtocolEvm } = await import(
+    "@tetherto/wdk-protocol-swap-velora-evm"
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const protocol = new (VeloraProtocolEvm as any)(account);
+  const opts =
+    options.direction === "sell"
+      ? {
+          tokenIn: options.tokenIn,
+          tokenOut: options.tokenOut,
+          tokenInAmount: options.amount,
+        }
+      : {
+          tokenIn: options.tokenIn,
+          tokenOut: options.tokenOut,
+          tokenOutAmount: options.amount,
+        };
+  const result = (await protocol.quoteSwap(opts)) as {
+    fee?: unknown;
+    tokenInAmount?: unknown;
+    tokenOutAmount?: unknown;
+  };
+  return {
+    fee: coerceBigInt(result?.fee),
+    tokenInAmount: coerceBigInt(result?.tokenInAmount),
+    tokenOutAmount: coerceBigInt(result?.tokenOutAmount),
+  };
+}
+
+/**
+ * Execute the swap. The caller is expected to have already approved
+ * the input token's allowance to the Velora router via the existing
+ * `setApproval(...)` helper — Velora rejects unapproved tokenIn at
+ * the protocol level, and we don't try to bundle the approval into
+ * the swap call here because gas estimation is cleaner when they
+ * stay separate.
+ */
+export async function executeSwap(
+  handle: WalletHandle,
+  chain: ChainId,
+  options: {
+    tokenIn: string;
+    tokenOut: string;
+    amount: bigint;
+    direction: SwapDirection;
+  },
+): Promise<SwapResult> {
+  if (!chainSupportsSwap(chain)) {
+    throw new Error(`Swap is only available on EVM chains in this template.`);
+  }
+  const account = handle.accounts[chain]?.account;
+  if (!account) throw new Error(`No ${chain} account derived.`);
+  const { default: VeloraProtocolEvm } = await import(
+    "@tetherto/wdk-protocol-swap-velora-evm"
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const protocol = new (VeloraProtocolEvm as any)(account);
+  const opts =
+    options.direction === "sell"
+      ? {
+          tokenIn: options.tokenIn,
+          tokenOut: options.tokenOut,
+          tokenInAmount: options.amount,
+        }
+      : {
+          tokenIn: options.tokenIn,
+          tokenOut: options.tokenOut,
+          tokenOutAmount: options.amount,
+        };
+  const result = (await protocol.swap(opts)) as {
+    hash?: string;
+    fee?: unknown;
+    tokenInAmount?: unknown;
+    tokenOutAmount?: unknown;
+  };
+  const signature = String(result?.hash ?? "");
+  if (!signature) {
+    throw new Error("Swap succeeded but no transaction hash returned.");
+  }
+  return {
+    signature,
+    fee: coerceBigInt(result?.fee),
+    tokenInAmount: coerceBigInt(result?.tokenInAmount),
+    tokenOutAmount: coerceBigInt(result?.tokenOutAmount),
+  };
+}
+
 export async function signMessage(
   handle: WalletHandle,
   chain: ChainId,
