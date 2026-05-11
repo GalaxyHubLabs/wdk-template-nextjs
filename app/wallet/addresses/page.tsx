@@ -14,6 +14,7 @@ import {
   type AddressEntry,
 } from "@/lib/address-book";
 import { CHAIN_CONFIGS, CHAIN_IDS, type ChainId } from "@/lib/chains";
+import { looksLikeName, resolveName } from "@/lib/name-resolution";
 import { hasVault } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { truncate } from "@/lib/utils";
@@ -31,6 +32,40 @@ export default function AddressesPage() {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
+  /** ENS / SNS resolution state for the Address field. */
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [resolveFailed, setResolveFailed] = useState(false);
+
+  // Resolve `.eth` / `.sol` names as the user types so the form can
+  // store the hex address while the user keeps thinking in names.
+  useEffect(() => {
+    if (!handle) return;
+    const trimmed = address.trim();
+    if (!looksLikeName(trimmed)) {
+      setResolvedAddress(null);
+      setResolving(false);
+      setResolveFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setResolving(true);
+    setResolveFailed(false);
+    const timer = setTimeout(async () => {
+      try {
+        const addr = await resolveName(formChain, trimmed, handle.network);
+        if (cancelled) return;
+        setResolvedAddress(addr);
+        setResolveFailed(addr == null);
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [address, formChain, handle]);
 
   useEffect(() => {
     if (!handle) {
@@ -54,6 +89,8 @@ export default function AddressesPage() {
     setName("");
     setAddress("");
     setNote("");
+    setResolvedAddress(null);
+    setResolveFailed(false);
     setShowForm(false);
   }
 
@@ -63,17 +100,34 @@ export default function AddressesPage() {
       toast.error("Name is required.");
       return;
     }
-    if (!isLikelyAddressFor(formChain, address)) {
+    if (resolving) {
+      toast.info("Still resolving name…");
+      return;
+    }
+    // Prefer the resolved hex when the user typed a name. Otherwise fall
+    // back to whatever they typed and let the chain-specific format
+    // check decide.
+    const finalAddress = resolvedAddress ?? address.trim();
+    if (!isLikelyAddressFor(formChain, finalAddress)) {
       toast.error(
-        `Address doesn't look valid for ${CHAIN_CONFIGS[formChain].label}.`,
+        looksLikeName(address)
+          ? `Couldn't resolve that name on ${CHAIN_CONFIGS[formChain].label}.`
+          : `Address doesn't look valid for ${CHAIN_CONFIGS[formChain].label}.`,
       );
       return;
     }
+    // The note carries the original name so the entry retains the
+    // "vitalik.eth" pedigree even after we store the hex.
+    const composedNote = looksLikeName(address)
+      ? note.trim()
+        ? `${address.trim()} · ${note.trim()}`
+        : address.trim()
+      : note.trim() || undefined;
     const entry = addAddressBookEntry(
       formChain,
       name.trim(),
-      address.trim(),
-      note.trim() || undefined,
+      finalAddress,
+      composedNote || undefined,
     );
     toast.success(`${entry.name} added to address book.`);
     setEntries(getAllAddressBookEntries());
@@ -172,12 +226,32 @@ export default function AddressesPage() {
                   id="address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder={`${CHAIN_CONFIGS[formChain].label} address`}
+                  placeholder={
+                    formChain === "solana"
+                      ? `${CHAIN_CONFIGS[formChain].label} address or .sol name`
+                      : isEvmChain(formChain)
+                        ? `${CHAIN_CONFIGS[formChain].label} address or .eth name`
+                        : `${CHAIN_CONFIGS[formChain].label} address`
+                  }
                   autoComplete="off"
                   spellCheck={false}
                   className="font-mono"
                   required
                 />
+                {resolving && (
+                  <p className="text-xs text-zinc-500">Resolving name…</p>
+                )}
+                {!resolving && resolvedAddress && (
+                  <p className="break-all text-xs text-emerald-600 dark:text-emerald-400">
+                    → {truncate(resolvedAddress, 8, 8)}
+                  </p>
+                )}
+                {!resolving && resolveFailed && (
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    Couldn&apos;t resolve that name on{" "}
+                    {CHAIN_CONFIGS[formChain].label}.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -270,5 +344,16 @@ export default function AddressesPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function isEvmChain(chain: ChainId): boolean {
+  return (
+    chain === "evm" ||
+    chain === "bsc" ||
+    chain === "polygon" ||
+    chain === "arbitrum" ||
+    chain === "base" ||
+    chain === "optimism"
   );
 }
