@@ -11,6 +11,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Fingerprint,
   KeyRound,
   Lock,
   Monitor,
@@ -31,6 +32,12 @@ import {
   saveAutoLockMinutes,
 } from "@/components/auto-lock";
 import { Button } from "@/components/ui/button";
+import {
+  disableBiometric,
+  enableBiometric,
+  isBiometricAvailable,
+  isBiometricEnrolled,
+} from "@/lib/biometric";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useTheme, type Theme } from "@/components/theme";
@@ -78,6 +85,16 @@ export default function SettingsPage() {
   const [rpcExpanded, setRpcExpanded] = useState<string | null>(null);
   const [rpcDraft, setRpcDraft] = useState<Record<string, string>>({});
   const [autoLockMin, setAutoLockMin] = useState<number>(15);
+  // Biometric — supported flag is set after a feature-detect, enrolled
+  // reflects the localStorage state and toggles on enable/disable.
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricOn, setBiometricOn] = useState(false);
+  const [biometricBusy, setBiometricBusy] = useState(false);
+  /** Re-uses the existing backup-password flow to capture the user's
+   *  password without storing it: the seed-reveal "auth" step verifies
+   *  the password, and we hand it to `enableBiometric` immediately. */
+  const [biometricSetupPwd, setBiometricSetupPwd] = useState("");
+  const [biometricPrompt, setBiometricPrompt] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [renaming, setRenaming] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -103,6 +120,8 @@ export default function SettingsPage() {
     setWatchList(getWatchList());
     setRpcOverrides(getAllOverrides() as Record<string, string>);
     setAutoLockMin(loadAutoLockMinutes());
+    setBiometricOn(isBiometricEnrolled());
+    void isBiometricAvailable().then(setBiometricSupported);
   }, []);
 
   if (!handle) {
@@ -216,9 +235,47 @@ export default function SettingsPage() {
     clearAllOverrides();
     resetRecentRecipients();
     resetTokenFavorites();
+    disableBiometric();
     setShowWipeConfirm(false);
     toast.info("Wallet wiped from this device.");
     router.replace("/");
+  }
+
+  async function toggleBiometric() {
+    if (biometricOn) {
+      disableBiometric();
+      setBiometricOn(false);
+      toast.info("Biometric unlock disabled.");
+      return;
+    }
+    // Need the user's password to encrypt — prompt for it.
+    setBiometricSetupPwd("");
+    setBiometricPrompt(true);
+  }
+
+  async function finishBiometricSetup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!biometricSetupPwd) return;
+    setBiometricBusy(true);
+    try {
+      // Verify the password actually decrypts the vault before binding
+      // it to the authenticator. Any thrown error here means "wrong
+      // password" and we abort without enrolling.
+      await unlockVault(biometricSetupPwd);
+      await enableBiometric(biometricSetupPwd);
+      setBiometricOn(true);
+      setBiometricPrompt(false);
+      setBiometricSetupPwd("");
+      toast.success("Biometric unlock enabled.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Couldn't enable biometric unlock.",
+      );
+    } finally {
+      setBiometricBusy(false);
+    }
   }
 
   function saveRpcOverride(chain: string, network: string) {
@@ -347,6 +404,87 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+
+            {/* Biometric quick-unlock — only surfaced on platforms
+                advertising a UV-capable platform authenticator. */}
+            {biometricSupported && (
+              <div className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-3 dark:border-zinc-800">
+                <div className="flex items-center gap-3">
+                  <Fingerprint size={18} />
+                  <div className="leading-tight">
+                    <p className="text-sm font-medium">Biometric unlock</p>
+                    <p className="text-xs text-zinc-500">
+                      Use Touch ID / Face ID / Windows Hello to unlock in
+                      a single tap. Password still required for the very
+                      first unlock after a wipe.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={biometricOn}
+                  onClick={() => void toggleBiometric()}
+                  disabled={biometricBusy}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    biometricOn ? "bg-brand" : "bg-zinc-200 dark:bg-zinc-800",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform",
+                      biometricOn ? "translate-x-5" : "translate-x-0.5",
+                    )}
+                  />
+                </button>
+              </div>
+            )}
+
+            {/* Inline password prompt for biometric setup. Renders in
+                the same card so the setup flow has zero context-switch. */}
+            {biometricPrompt && (
+              <form
+                onSubmit={finishBiometricSetup}
+                className="space-y-2 rounded-lg border border-brand/30 bg-brand-soft p-3"
+              >
+                <p className="text-xs text-zinc-700 dark:text-zinc-200">
+                  Confirm your wallet password to bind it to this device&apos;s
+                  biometric authenticator.
+                </p>
+                <Input
+                  type="password"
+                  value={biometricSetupPwd}
+                  onChange={(e) => setBiometricSetupPwd(e.target.value)}
+                  placeholder="Wallet password"
+                  autoComplete="current-password"
+                  autoFocus
+                  required
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setBiometricPrompt(false);
+                      setBiometricSetupPwd("");
+                    }}
+                    disabled={biometricBusy}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    loading={biometricBusy}
+                    disabled={biometricBusy}
+                    className="flex-1"
+                  >
+                    <Fingerprint size={14} /> Enable
+                  </Button>
+                </div>
+              </form>
+            )}
 
             {/* Auto-lock — idle timeout */}
             <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">

@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, ShieldCheck, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Fingerprint, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  disableBiometric,
+  isBiometricEnrolled,
+  unlockWithBiometric,
+} from "@/lib/biometric";
 import { clearVault, hasVault, unlockVault } from "@/lib/storage";
 import { openWallet } from "@/lib/wdk-client";
 import { useWalletStore } from "@/store/wallet";
@@ -22,7 +27,13 @@ export default function UnlockPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [biometricBusy, setBiometricBusy] = useState(false);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+
+  useEffect(() => {
+    setBiometricEnrolled(isBiometricEnrolled());
+  }, []);
 
   // If there's no vault on this device, send the user back to the landing
   // — there's nothing to unlock.
@@ -51,8 +62,33 @@ export default function UnlockPage() {
     }
   }
 
+  async function handleBiometricUnlock() {
+    setError(null);
+    setBiometricBusy(true);
+    setStatus("loading");
+    try {
+      // The biometric ceremony returns the original password; the
+      // rest of the unlock follows the manual-entry path unchanged.
+      const recovered = await unlockWithBiometric();
+      const seed = await unlockVault(recovered);
+      const handle = await openWallet(seed, activeNetwork);
+      setHandle(handle);
+      setStatus("ready");
+      router.push("/wallet");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Biometric unlock didn't complete.";
+      setError(message);
+      setStatus("error", message);
+      setBiometricBusy(false);
+    }
+  }
+
   function handleWipe() {
     clearVault();
+    disableBiometric();
     setShowWipeConfirm(false);
     router.replace("/");
   }
@@ -105,6 +141,42 @@ export default function UnlockPage() {
               <ShieldCheck size={16} /> Unlock
             </Button>
           </form>
+
+          {biometricEnrolled && (
+            <>
+              <div className="my-4 flex items-center gap-3">
+                <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                  Or
+                </span>
+                <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleBiometricUnlock}
+                loading={biometricBusy}
+                disabled={busy || biometricBusy}
+                className="w-full"
+              >
+                <Fingerprint size={16} /> Unlock with biometric
+              </Button>
+              <p className="mt-2 text-center text-[11px] text-zinc-500">
+                Or{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    disableBiometric();
+                    setBiometricEnrolled(false);
+                  }}
+                  className="underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  remove biometric from this device
+                </button>
+                .
+              </p>
+            </>
+          )}
         </Card>
 
         <div className="space-y-3 text-center">

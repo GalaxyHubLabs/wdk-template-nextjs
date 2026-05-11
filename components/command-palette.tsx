@@ -10,6 +10,7 @@ import {
   ImageIcon,
   KeyRound,
   Lock,
+  PenLine,
   Plus,
   Search,
   Settings,
@@ -150,6 +151,14 @@ export function CommandPalette() {
           Icon: BookUser,
           keywords: "contacts recipients",
           run: go("/wallet/addresses"),
+        },
+        {
+          id: "sign",
+          label: "Sign message",
+          description: "Prove ownership by signing arbitrary text",
+          Icon: PenLine,
+          keywords: "authenticate siwe attestation",
+          run: go("/wallet/sign"),
         },
         {
           id: "add-token",

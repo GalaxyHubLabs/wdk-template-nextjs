@@ -34,6 +34,11 @@ type ChainAccount = {
   sendTransaction?(tx: unknown): Promise<unknown>;
   transfer?(options: unknown): Promise<unknown>;
   quoteTransfer?(options: unknown): Promise<unknown>;
+  /** Signs an arbitrary message. Uniform across every chain — Solana
+   *  signs a 32-byte Ed25519 sig hex-encoded, EVM emits an EIP-191
+   *  signature, TRON its TIP-712 personal signature, TON its
+   *  Ed25519 over the message bytes. WDK abstracts the differences. */
+  sign?(message: string): Promise<string>;
 };
 
 export interface AccountHandle {
@@ -537,6 +542,33 @@ function etherscanEndpoint(chain: ChainId, network: NetworkKey): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * Sign an arbitrary UTF-8 message with the active account on a chain.
+ *
+ * Every WDK wallet module exposes a uniform `sign(message: string)`
+ * method, so a single dispatcher handles Solana, TRON, TON, and every
+ * EVM chain. The signature format depends on the chain — callers
+ * should treat the return value as opaque and pass it to whichever
+ * verifier they're talking to.
+ *
+ * Typical use cases:
+ *   - "Sign in with Ethereum" dApp authentication flows.
+ *   - Proving address ownership to a backend (e.g. claiming an
+ *     account on an off-chain service).
+ *   - Lightweight attestations from an AI agent driving the wallet.
+ */
+export async function signMessage(
+  handle: WalletHandle,
+  chain: ChainId,
+  message: string,
+): Promise<string> {
+  const account = handle.accounts[chain]?.account;
+  if (!account?.sign) {
+    throw new Error(`Message signing is not supported for ${chain}.`);
+  }
+  return await account.sign(message);
 }
 
 function safeBigInt(v: string): bigint {
