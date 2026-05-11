@@ -14,6 +14,7 @@ import {
   History,
   ImageIcon,
   Lock,
+  Network as NetworkIcon,
   Plus,
   RefreshCcw,
   Settings,
@@ -618,6 +619,27 @@ export default function WalletPage() {
                 <p className="text-sm font-medium">Swap tokens</p>
                 <p className="text-xs text-zinc-500">
                   Powered by Tether&apos;s WDK Velora protocol module
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400">→</span>
+          </Link>
+        )}
+
+        {/* EVM-only entry point: cross-chain USDT bridge. */}
+        {activeAccount && chainSupportsApprovals(activeChain) && (
+          <Link
+            href="/wallet/bridge"
+            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <NetworkIcon size={16} />
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-medium">Bridge USDT</p>
+                <p className="text-xs text-zinc-500">
+                  Cross-chain USDT via Tether&apos;s WDK USDT0 module
                 </p>
               </div>
             </div>

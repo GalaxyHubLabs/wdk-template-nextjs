@@ -11,6 +11,7 @@ import {
   ImageIcon,
   KeyRound,
   Lock,
+  Network as NetworkIcon,
   PenLine,
   Plus,
   Search,
@@ -177,6 +178,14 @@ export function CommandPalette() {
           Icon: ArrowLeftRight,
           keywords: "trade exchange velora paraswap dex",
           run: go("/wallet/swap"),
+        },
+        {
+          id: "bridge",
+          label: "Bridge USDT",
+          description: "Cross-chain USDT via Tether's WDK USDT0 module",
+          Icon: NetworkIcon,
+          keywords: "cross-chain layerzero oft usdt0",
+          run: go("/wallet/bridge"),
         },
         {
           id: "add-token",

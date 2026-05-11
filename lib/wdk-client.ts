@@ -773,6 +773,147 @@ export async function executeSwap(
   };
 }
 
+// ─── USDT0 bridge (EVM family) ────────────────────────────────────────
+
+export interface BridgeQuote {
+  /** Network fee on the source chain (gas), in native wei. */
+  fee: bigint;
+  /** LayerZero / bridge protocol fee in native units. */
+  bridgeFee: bigint;
+}
+
+export interface BridgeResult extends BridgeQuote {
+  /** Source-chain transaction hash. The bridged tokens land on the
+   *  destination chain after LayerZero's relayers confirm — usually
+   *  seconds to a few minutes depending on the corridor. */
+  signature: string;
+}
+
+/** Chains the USDT0 bridge currently supports as source. Mirrors the
+ *  EVM family — the protocol's destination set is broader and includes
+ *  non-EVM chains too, but this wallet only exposes EVM sources. */
+function chainSupportsBridge(chain: ChainId): boolean {
+  return chainSupportsSwap(chain); // same EVM family
+}
+
+export function isBridgeSupported(chain: ChainId): boolean {
+  return chainSupportsBridge(chain);
+}
+
+/** WDK chain id → USDT0/LayerZero target identifier accepted by
+ *  `bridge({ targetChain })`. Mirrors the package's documented list. */
+function toBridgeTargetId(chain: ChainId): string | null {
+  switch (chain) {
+    case "evm":
+      return "ethereum";
+    case "bsc":
+      return "bsc";
+    case "polygon":
+      return "polygon";
+    case "arbitrum":
+      return "arbitrum";
+    case "base":
+      return "base";
+    case "optimism":
+      return "optimism";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Quote the cost of bridging `amount` of `token` from the active EVM
+ * chain to `targetChain` via the USDT0 protocol (LayerZero OFT). The
+ * caller must have already approved the bridge router for at least
+ * `amount` of the input token — Velora-style allowance is needed
+ * here too because the bridge contract pulls tokens from the user.
+ */
+export async function quoteBridge(
+  handle: WalletHandle,
+  sourceChain: ChainId,
+  options: {
+    token: string;
+    amount: bigint;
+    recipient: string;
+    targetChain: ChainId;
+  },
+): Promise<BridgeQuote> {
+  if (!chainSupportsBridge(sourceChain)) {
+    throw new Error(
+      `Bridging is only available from EVM chains in this template.`,
+    );
+  }
+  const account = handle.accounts[sourceChain]?.account;
+  if (!account) throw new Error(`No ${sourceChain} account derived.`);
+  const targetId = toBridgeTargetId(options.targetChain);
+  if (!targetId) {
+    throw new Error(
+      `${options.targetChain} is not a supported USDT0 destination yet.`,
+    );
+  }
+  const { default: Usdt0ProtocolEvm } = await import(
+    "@tetherto/wdk-protocol-bridge-usdt0-evm"
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const protocol = new (Usdt0ProtocolEvm as any)(account);
+  const result = (await protocol.quoteBridge({
+    targetChain: targetId,
+    recipient: options.recipient,
+    token: options.token,
+    amount: options.amount,
+  })) as { fee?: unknown; bridgeFee?: unknown };
+  return {
+    fee: coerceBigInt(result?.fee),
+    bridgeFee: coerceBigInt(result?.bridgeFee),
+  };
+}
+
+/** Execute the bridge. Same pre-approval requirement as `quoteBridge`. */
+export async function executeBridge(
+  handle: WalletHandle,
+  sourceChain: ChainId,
+  options: {
+    token: string;
+    amount: bigint;
+    recipient: string;
+    targetChain: ChainId;
+  },
+): Promise<BridgeResult> {
+  if (!chainSupportsBridge(sourceChain)) {
+    throw new Error(
+      `Bridging is only available from EVM chains in this template.`,
+    );
+  }
+  const account = handle.accounts[sourceChain]?.account;
+  if (!account) throw new Error(`No ${sourceChain} account derived.`);
+  const targetId = toBridgeTargetId(options.targetChain);
+  if (!targetId) {
+    throw new Error(
+      `${options.targetChain} is not a supported USDT0 destination yet.`,
+    );
+  }
+  const { default: Usdt0ProtocolEvm } = await import(
+    "@tetherto/wdk-protocol-bridge-usdt0-evm"
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const protocol = new (Usdt0ProtocolEvm as any)(account);
+  const result = (await protocol.bridge({
+    targetChain: targetId,
+    recipient: options.recipient,
+    token: options.token,
+    amount: options.amount,
+  })) as { hash?: string; fee?: unknown; bridgeFee?: unknown };
+  const signature = String(result?.hash ?? "");
+  if (!signature) {
+    throw new Error("Bridge succeeded but no transaction hash returned.");
+  }
+  return {
+    signature,
+    fee: coerceBigInt(result?.fee),
+    bridgeFee: coerceBigInt(result?.bridgeFee),
+  };
+}
+
 export async function signMessage(
   handle: WalletHandle,
   chain: ChainId,
