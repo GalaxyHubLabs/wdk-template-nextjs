@@ -6,6 +6,8 @@ import {
   ArrowLeftRight,
   ArrowRight,
   Bot,
+  Check,
+  Copy,
   Eye,
   KeyRound,
   Lock,
@@ -36,9 +38,35 @@ const buttonStyles =
  */
 export default function Home() {
   const [vaultPresent, setVaultPresent] = useState(false);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
   useEffect(() => {
     setVaultPresent(hasVault());
   }, []);
+
+  /** Exact snippet a user pastes into claude_desktop_config.json. The
+   *  URL host is intentionally a placeholder — the agents guide
+   *  explains how to swap it for the live deployment URL. */
+  const mcpSnippet = `{
+  "mcpServers": {
+    "wdk-wallet": {
+      "transport": {
+        "type": "http",
+        "url": "https://your-domain/api/mcp"
+      }
+    }
+  }
+}`;
+
+  async function copyMcpSnippet() {
+    try {
+      await navigator.clipboard.writeText(mcpSnippet);
+      setCopiedSnippet(true);
+      setTimeout(() => setCopiedSnippet(false), 1800);
+    } catch {
+      // Clipboard blocked — the agents guide still has a working copy
+      // affordance, so we fail silently here.
+    }
+  }
 
   return (
     <main className="flex flex-1 flex-col">
@@ -297,9 +325,28 @@ export default function Home() {
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
                   </div>
-                  <span className="font-mono text-[10px] text-zinc-500">
-                    claude_desktop_config.json
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-zinc-500">
+                      claude_desktop_config.json
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyMcpSnippet}
+                      aria-label="Copy snippet"
+                      className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900 px-2 py-0.5 font-mono text-[10px] text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-800"
+                    >
+                      {copiedSnippet ? (
+                        <>
+                          <Check size={10} className="text-emerald-400" />{" "}
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={10} /> Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <pre className="overflow-x-auto p-4 font-mono text-[11px] leading-relaxed text-zinc-300">
                   <code>
