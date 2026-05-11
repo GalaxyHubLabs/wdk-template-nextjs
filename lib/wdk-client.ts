@@ -109,6 +109,23 @@ export async function openWallet(
     })
     .registerWallet("bsc", WalletManagerEvm as any, {
       provider: networkSpec("bsc", network).rpcUrl,
+    })
+    // L2 EVM-compatible chains. WDK's EVM module is intentionally chain-id
+    // agnostic — every entry below reuses the same WalletManagerEvm with
+    // its own RPC, demonstrating the WDK pattern of one module powering
+    // many networks. Tether's canonical USDT deployment is configured per
+    // chain in `lib/chains.ts`.
+    .registerWallet("polygon", WalletManagerEvm as any, {
+      provider: networkSpec("polygon", network).rpcUrl,
+    })
+    .registerWallet("arbitrum", WalletManagerEvm as any, {
+      provider: networkSpec("arbitrum", network).rpcUrl,
+    })
+    .registerWallet("base", WalletManagerEvm as any, {
+      provider: networkSpec("base", network).rpcUrl,
+    })
+    .registerWallet("optimism", WalletManagerEvm as any, {
+      provider: networkSpec("optimism", network).rpcUrl,
     });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -296,6 +313,11 @@ export function isLikelyAddressFor(chain: ChainId, value: string): boolean {
     case "ton":
       return /^[A-Za-z0-9_-]{48}$/.test(v) || /^-?\d+:[0-9a-fA-F]{64}$/.test(v);
     case "evm":
+    case "bsc":
+    case "polygon":
+    case "arbitrum":
+    case "base":
+    case "optimism":
       return /^0x[0-9a-fA-F]{40}$/.test(v);
     default:
       return false;

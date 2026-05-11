@@ -189,9 +189,12 @@ function placeholderFor(chain: ChainId): string {
     case "ton":
       return "EQDr…AAGE";
     case "evm":
-      return "0xdAC1…831ec7";
     case "bsc":
-      return "0x55d3…197955";
+    case "polygon":
+    case "arbitrum":
+    case "base":
+    case "optimism":
+      return "0xdAC1…831ec7";
     default:
       return "Address";
   }

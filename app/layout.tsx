@@ -18,7 +18,36 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "WDK Template Wallet — Next.js",
   description:
-    "Self-custodial multi-chain wallet template built on Tether WDK. Solana, TRON, TON, and Ethereum from a single seed. Production-ready scaffold for human users and AI agents.",
+    "Self-custodial multi-chain wallet template built on Tether WDK. Solana, TRON, TON, Ethereum, BSC, Polygon, Arbitrum, Base, and Optimism from a single seed. USDT-first. Production-ready scaffold for human users and AI agents.",
+  applicationName: "WDK Template Wallet",
+  authors: [{ name: "GalaxyHubLabs" }],
+  keywords: [
+    "Tether",
+    "WDK",
+    "Wallet Development Kit",
+    "USDT",
+    "Solana",
+    "TRON",
+    "TON",
+    "Ethereum",
+    "multi-chain wallet",
+    "self-custody",
+    "Next.js",
+    "AI agents",
+  ],
+  openGraph: {
+    type: "website",
+    title: "WDK Template Wallet — multi-chain, USDT-first",
+    description:
+      "One seed, nine chains. Open-source Next.js template built on Tether's Wallet Development Kit. Solana · TRON · TON · Ethereum · BSC · Polygon · Arbitrum · Base · Optimism.",
+    siteName: "WDK Template Wallet",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "WDK Template Wallet — multi-chain, USDT-first",
+    description:
+      "Open-source Next.js wallet template on Tether WDK. Nine chains from one seed. Designed to be forked.",
+  },
 };
 
 export default function RootLayout({

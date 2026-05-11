@@ -35,6 +35,10 @@ export async function fetchNativeBalance(
         return await fetchSolanaNative(rpcUrl, address);
       case "evm":
       case "bsc":
+      case "polygon":
+      case "arbitrum":
+      case "base":
+      case "optimism":
         return await fetchEvmNative(rpcUrl, address);
       case "tron":
         return await fetchTronNative(rpcUrl, address);
@@ -124,6 +128,10 @@ async function fetchTokenBalance(
   switch (chain) {
     case "evm":
     case "bsc":
+    case "polygon":
+    case "arbitrum":
+    case "base":
+    case "optimism":
       return fetchErc20Balance(rpcUrl, address, token.address);
     case "solana":
       return fetchSplBalance(rpcUrl, address, token.address);

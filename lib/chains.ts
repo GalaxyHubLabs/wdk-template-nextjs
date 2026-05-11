@@ -13,7 +13,16 @@
  * own deployment.
  */
 
-export type ChainId = "solana" | "tron" | "ton" | "evm" | "bsc";
+export type ChainId =
+  | "solana"
+  | "tron"
+  | "ton"
+  | "evm"
+  | "bsc"
+  | "polygon"
+  | "arbitrum"
+  | "base"
+  | "optimism";
 export type NetworkKey = "mainnet" | "testnet";
 
 export interface TetherToken {
@@ -56,7 +65,8 @@ export interface ChainConfig {
     | "tron"
     | "the-open-network"
     | "ethereum"
-    | "binancecoin";
+    | "binancecoin"
+    | "matic-network";
   mainnet: NetworkSpec;
   testnet: NetworkSpec;
 }
@@ -315,6 +325,188 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
       }),
     },
   },
+  polygon: {
+    id: "polygon",
+    label: "Polygon",
+    shortLabel: "MATIC",
+    nativeSymbol: "MATIC",
+    nativeName: "Polygon",
+    nativeDecimals: 18,
+    logo: `${TRUSTWALLET}/polygon/info/logo.png`,
+    nativePriceId: "matic-network",
+    mainnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_POLYGON_RPC_MAINNET",
+        "https://polygon-rpc.com",
+      ),
+      txExplorer: (sig) => `https://polygonscan.com/tx/${sig}`,
+      addressExplorer: (addr) => `https://polygonscan.com/address/${addr}`,
+      tetherTokens: [
+        {
+          symbol: "USDT",
+          // Native Tether deployment on Polygon (PoS). Source: Tether docs.
+          address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+          decimals: 6,
+          name: "Tether USD",
+          logo: USDT_LOGO,
+          priceId: "tether",
+        },
+      ],
+    },
+    testnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_POLYGON_RPC_TESTNET",
+        "https://rpc-amoy.polygon.technology",
+      ),
+      txExplorer: (sig) => `https://amoy.polygonscan.com/tx/${sig}`,
+      addressExplorer: (addr) => `https://amoy.polygonscan.com/address/${addr}`,
+      faucetUrl: "https://www.alchemy.com/faucets/polygon-amoy",
+      tetherTokens: envToken("NEXT_PUBLIC_POLYGON_USDT_TESTNET", {
+        symbol: "USDT",
+        decimals: 6,
+        name: "Tether USD (Amoy)",
+        logo: USDT_LOGO,
+        priceId: "tether",
+      }),
+    },
+  },
+  arbitrum: {
+    id: "arbitrum",
+    label: "Arbitrum",
+    shortLabel: "ARB",
+    nativeSymbol: "ETH",
+    nativeName: "Ether on Arbitrum",
+    nativeDecimals: 18,
+    logo: `${TRUSTWALLET}/arbitrum/info/logo.png`,
+    nativePriceId: "ethereum",
+    mainnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_ARBITRUM_RPC_MAINNET",
+        "https://arb1.arbitrum.io/rpc",
+      ),
+      txExplorer: (sig) => `https://arbiscan.io/tx/${sig}`,
+      addressExplorer: (addr) => `https://arbiscan.io/address/${addr}`,
+      tetherTokens: [
+        {
+          symbol: "USDT",
+          // Native Tether deployment on Arbitrum One.
+          address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+          decimals: 6,
+          name: "Tether USD",
+          logo: USDT_LOGO,
+          priceId: "tether",
+        },
+      ],
+    },
+    testnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_ARBITRUM_RPC_TESTNET",
+        "https://sepolia-rollup.arbitrum.io/rpc",
+      ),
+      txExplorer: (sig) => `https://sepolia.arbiscan.io/tx/${sig}`,
+      addressExplorer: (addr) => `https://sepolia.arbiscan.io/address/${addr}`,
+      faucetUrl: "https://www.alchemy.com/faucets/arbitrum-sepolia",
+      tetherTokens: envToken("NEXT_PUBLIC_ARBITRUM_USDT_TESTNET", {
+        symbol: "USDT",
+        decimals: 6,
+        name: "Tether USD (Arb Sepolia)",
+        logo: USDT_LOGO,
+        priceId: "tether",
+      }),
+    },
+  },
+  base: {
+    id: "base",
+    label: "Base",
+    shortLabel: "BASE",
+    nativeSymbol: "ETH",
+    nativeName: "Ether on Base",
+    nativeDecimals: 18,
+    logo: `${TRUSTWALLET}/base/info/logo.png`,
+    nativePriceId: "ethereum",
+    mainnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_BASE_RPC_MAINNET",
+        "https://mainnet.base.org",
+      ),
+      txExplorer: (sig) => `https://basescan.org/tx/${sig}`,
+      addressExplorer: (addr) => `https://basescan.org/address/${addr}`,
+      // Tether has not officially deployed USDT to Base at the time of
+      // this template's release. Plug in your own address via the env
+      // override below if you need it before the canonical deployment
+      // ships.
+      tetherTokens: envToken("NEXT_PUBLIC_BASE_USDT_MAINNET", {
+        symbol: "USDT",
+        decimals: 6,
+        name: "Tether USD",
+        logo: USDT_LOGO,
+        priceId: "tether",
+      }),
+    },
+    testnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_BASE_RPC_TESTNET",
+        "https://sepolia.base.org",
+      ),
+      txExplorer: (sig) => `https://sepolia.basescan.org/tx/${sig}`,
+      addressExplorer: (addr) => `https://sepolia.basescan.org/address/${addr}`,
+      faucetUrl: "https://www.alchemy.com/faucets/base-sepolia",
+      tetherTokens: envToken("NEXT_PUBLIC_BASE_USDT_TESTNET", {
+        symbol: "USDT",
+        decimals: 6,
+        name: "Tether USD (Base Sepolia)",
+        logo: USDT_LOGO,
+        priceId: "tether",
+      }),
+    },
+  },
+  optimism: {
+    id: "optimism",
+    label: "Optimism",
+    shortLabel: "OP",
+    nativeSymbol: "ETH",
+    nativeName: "Ether on Optimism",
+    nativeDecimals: 18,
+    logo: `${TRUSTWALLET}/optimism/info/logo.png`,
+    nativePriceId: "ethereum",
+    mainnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_OPTIMISM_RPC_MAINNET",
+        "https://mainnet.optimism.io",
+      ),
+      txExplorer: (sig) => `https://optimistic.etherscan.io/tx/${sig}`,
+      addressExplorer: (addr) =>
+        `https://optimistic.etherscan.io/address/${addr}`,
+      tetherTokens: [
+        {
+          symbol: "USDT",
+          // Native Tether deployment on OP mainnet.
+          address: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+          decimals: 6,
+          name: "Tether USD",
+          logo: USDT_LOGO,
+          priceId: "tether",
+        },
+      ],
+    },
+    testnet: {
+      rpcUrl: envOr(
+        "NEXT_PUBLIC_OPTIMISM_RPC_TESTNET",
+        "https://sepolia.optimism.io",
+      ),
+      txExplorer: (sig) => `https://sepolia-optimism.etherscan.io/tx/${sig}`,
+      addressExplorer: (addr) =>
+        `https://sepolia-optimism.etherscan.io/address/${addr}`,
+      faucetUrl: "https://www.alchemy.com/faucets/optimism-sepolia",
+      tetherTokens: envToken("NEXT_PUBLIC_OPTIMISM_USDT_TESTNET", {
+        symbol: "USDT",
+        decimals: 6,
+        name: "Tether USD (OP Sepolia)",
+        logo: USDT_LOGO,
+        priceId: "tether",
+      }),
+    },
+  },
 };
 
 export const CHAIN_IDS: readonly ChainId[] = [
@@ -323,6 +515,10 @@ export const CHAIN_IDS: readonly ChainId[] = [
   "ton",
   "evm",
   "bsc",
+  "polygon",
+  "arbitrum",
+  "base",
+  "optimism",
 ];
 
 export const DEFAULT_CHAIN: ChainId = "solana";
@@ -353,11 +549,5 @@ export const COMING_SOON_CHAINS: Array<{
     shortLabel: "BTC",
     logo: `${TRUSTWALLET}/bitcoin/info/logo.png`,
     note: "Awaiting @tetherto/wdk-wallet-bitcoin",
-  },
-  {
-    label: "Polygon",
-    shortLabel: "MATIC",
-    logo: `${TRUSTWALLET}/polygon/info/logo.png`,
-    note: "EVM module ready — RPC config pending",
   },
 ];

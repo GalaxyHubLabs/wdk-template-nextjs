@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { AddressAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -326,15 +327,23 @@ export default function SettingsPage() {
                     disabled={switching || isActive}
                     className="flex flex-1 items-center gap-3 text-left disabled:cursor-default"
                   >
-                    <div
-                      className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                        isActive
-                          ? "bg-brand text-brand-foreground"
-                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200",
-                      )}
-                    >
-                      {entry.index + 1}
+                    <div className="relative shrink-0">
+                      {/* Avatar is keyed off the BIP-44 index so it stays
+                          stable across renames, switches, and reloads. */}
+                      <AddressAvatar
+                        address={`account:${entry.index}`}
+                        size={36}
+                      />
+                      <span
+                        className={cn(
+                          "absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold dark:border-zinc-950",
+                          isActive
+                            ? "bg-brand text-brand-foreground"
+                            : "bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200",
+                        )}
+                      >
+                        {entry.index + 1}
+                      </span>
                     </div>
                     <div className="min-w-0 flex-1 leading-tight">
                       {isEditing ? (
@@ -429,15 +438,13 @@ export default function SettingsPage() {
                       href={`/watch/${entry.id}`}
                       className="flex flex-1 items-center gap-3 text-left"
                     >
-                      <div className="relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={c.logo}
-                          alt={c.label}
-                          className="h-9 w-9 rounded-full bg-zinc-100 dark:bg-zinc-800"
-                          loading="lazy"
-                        />
-                        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-zinc-100 text-zinc-600 dark:border-zinc-950 dark:bg-zinc-900 dark:text-zinc-300">
+                      <div className="relative shrink-0">
+                        <AddressAvatar address={entry.address} size={36} />
+                        <span
+                          className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-zinc-100 text-zinc-600 dark:border-zinc-950 dark:bg-zinc-900 dark:text-zinc-300"
+                          title="Watch-only"
+                          aria-label="Watch-only"
+                        >
                           <Eye size={9} />
                         </span>
                       </div>

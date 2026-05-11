@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { AddressAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -262,28 +263,33 @@ export default function WatchAddressPage() {
 
         {/* Address card */}
         <Card>
-          <CardDescription>Address</CardDescription>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <CardTitle className="break-all font-mono text-lg">
-              {truncate(entry.address, 6, 6)}
-            </CardTitle>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={copyAddress}
-                aria-label="Copy address"
-                className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-              </button>
-              <a
-                href={spec.addressExplorer(entry.address)}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="View on explorer"
-                className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
-              >
-                <ExternalLink size={14} />
-              </a>
+          <div className="flex items-start gap-4">
+            <AddressAvatar address={entry.address} size={48} className="shrink-0" />
+            <div className="min-w-0 flex-1">
+              <CardDescription>Address</CardDescription>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <CardTitle className="break-all font-mono text-lg">
+                  {truncate(entry.address, 6, 6)}
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={copyAddress}
+                    aria-label="Copy address"
+                    className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                  <a
+                    href={spec.addressExplorer(entry.address)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="View on explorer"
+                    className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+                  >
+                    <ExternalLink size={14} />
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 

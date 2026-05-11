@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { AddressAvatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Dropdown } from "@/components/ui/dropdown";
@@ -350,30 +351,42 @@ export default function WalletPage() {
         {/* Account card */}
         {activeAccount ? (
           <Card>
-            <CardDescription>
-              {activeConfig.label} · {NETWORK_LABEL[handle.network]}
-            </CardDescription>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <CardTitle className="font-mono text-lg break-all">
-                {truncate(activeAccount.address, 6, 6)}
-              </CardTitle>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={copyAddress}
-                  aria-label="Copy address"
-                  className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
-                >
-                  <Copy size={14} />
-                </button>
-                <a
-                  href={activeSpec.addressExplorer(activeAccount.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="View on explorer"
-                  className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
-                >
-                  <ExternalLink size={14} />
-                </a>
+            <div className="flex items-start gap-4">
+              {/* Deterministic per-address avatar — same input always
+                  paints the same gradient so users learn their accounts
+                  visually. Stacked next to the address summary. */}
+              <AddressAvatar
+                address={activeAccount.address}
+                size={48}
+                className="shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <CardDescription>
+                  {activeConfig.label} · {NETWORK_LABEL[handle.network]}
+                </CardDescription>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <CardTitle className="font-mono text-lg break-all">
+                    {truncate(activeAccount.address, 6, 6)}
+                  </CardTitle>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={copyAddress}
+                      aria-label="Copy address"
+                      className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <a
+                      href={activeSpec.addressExplorer(activeAccount.address)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="View on explorer"
+                      className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
             {copied && (
