@@ -39,6 +39,14 @@ type ChainAccount = {
    *  signature, TRON its TIP-712 personal signature, TON its
    *  Ed25519 over the message bytes. WDK abstracts the differences. */
   sign?(message: string): Promise<string>;
+  /** EVM-only: set an ERC-20 allowance. WDK throws if you try to
+   *  modify a non-zero USDT-on-Ethereum allowance without zeroing
+   *  first, which matches the well-known on-chain quirk. */
+  approve?(options: {
+    token: string;
+    spender: string;
+    amount: number | bigint;
+  }): Promise<unknown>;
 };
 
 export interface AccountHandle {
@@ -559,6 +567,38 @@ function etherscanEndpoint(chain: ChainId, network: NetworkKey): string | null {
  *     account on an off-chain service).
  *   - Lightweight attestations from an AI agent driving the wallet.
  */
+/**
+ * Set an ERC-20 token's allowance for a spender. The wallet UI uses
+ * this with `amount: 0n` to revoke standing approvals from the
+ * Approvals page. Setting a non-zero allowance is also valid for the
+ * usual "approve a DEX router" flow, but the template doesn't yet
+ * expose a UI for that — agents driving the wallet may use it
+ * directly via `lib/wdk-client.ts` though.
+ *
+ * Only EVM-family chains support this. Throws on every other chain
+ * so the caller can surface a clear error.
+ */
+export async function setApproval(
+  handle: WalletHandle,
+  chain: ChainId,
+  options: { token: string; spender: string; amount: bigint },
+): Promise<SendResult> {
+  const account = handle.accounts[chain]?.account;
+  if (!account?.approve) {
+    throw new Error(`Token approvals are not supported for ${chain}.`);
+  }
+  const result = (await account.approve({
+    token: options.token,
+    spender: options.spender,
+    amount: options.amount,
+  })) as { hash?: string; fee?: unknown };
+  const signature = String(result?.hash ?? "");
+  if (!signature) {
+    throw new Error("Approval succeeded but no signature returned.");
+  }
+  return { signature, fee: coerceBigInt(result?.fee) };
+}
+
 export async function signMessage(
   handle: WalletHandle,
   chain: ChainId,

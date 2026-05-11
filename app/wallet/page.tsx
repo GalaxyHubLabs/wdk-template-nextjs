@@ -16,6 +16,7 @@ import {
   Plus,
   RefreshCcw,
   Settings,
+  ShieldOff,
   Star,
   Trash2,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import {
   isFavoriteToken,
   toggleFavoriteToken,
 } from "@/lib/token-favorites";
+import { chainSupportsApprovals } from "@/lib/approvals";
 import {
   formatChange,
   formatUsd,
@@ -570,6 +572,28 @@ export default function WalletPage() {
                 <p className="text-sm font-medium">Collectibles</p>
                 <p className="text-xs text-zinc-500">
                   Solana NFTs owned by this account
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400">→</span>
+          </Link>
+        )}
+
+        {/* EVM-only entry point: standing token approvals. Same row
+            visual treatment as Collectibles. */}
+        {activeAccount && chainSupportsApprovals(activeChain) && (
+          <Link
+            href="/wallet/approvals"
+            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <ShieldOff size={16} />
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-medium">Token approvals</p>
+                <p className="text-xs text-zinc-500">
+                  Review and revoke standing ERC-20 authorisations
                 </p>
               </div>
             </div>

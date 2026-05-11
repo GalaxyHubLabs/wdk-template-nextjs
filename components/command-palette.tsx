@@ -14,6 +14,7 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldOff,
   Wallet,
 } from "lucide-react";
 
@@ -159,6 +160,14 @@ export function CommandPalette() {
           Icon: PenLine,
           keywords: "authenticate siwe attestation",
           run: go("/wallet/sign"),
+        },
+        {
+          id: "approvals",
+          label: "Token approvals",
+          description: "Review and revoke standing ERC-20 authorisations",
+          Icon: ShieldOff,
+          keywords: "revoke allowance erc20 dex",
+          run: go("/wallet/approvals"),
         },
         {
           id: "add-token",
