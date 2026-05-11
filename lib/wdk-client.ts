@@ -170,6 +170,7 @@ async function deriveAllChains(
   accountIndex: number,
 ): Promise<Record<ChainId, AccountHandle>> {
   const accounts = {} as Record<ChainId, AccountHandle>;
+  const failures: Array<{ chain: ChainId; error: unknown }> = [];
   await Promise.all(
     CHAIN_IDS.map(async (chain) => {
       try {
@@ -181,10 +182,23 @@ async function deriveAllChains(
         const address = typeof addrResult === "string" ? addrResult : String(addrResult);
         accounts[chain] = { chain, address, account };
       } catch (err) {
-        console.warn(`Failed to derive account for ${chain}:`, err);
+        // Detailed log for the developer console; the dashboard shows
+        // the chain as disabled in the picker so the UX degrades
+        // gracefully on a per-chain basis.
+        console.warn(`[WDK] Failed to derive account for ${chain}:`, err);
+        failures.push({ chain, error: err });
       }
     }),
   );
+  if (failures.length > 0 && typeof window !== "undefined") {
+    // One-line aggregate so a user who notices a missing chain knows
+    // it isn't the wallet hanging — it's that one chain's RPC or
+    // module failed at boot time.
+    console.warn(
+      `[WDK] ${failures.length} chain(s) unavailable: ` +
+        failures.map((f) => f.chain).join(", "),
+    );
+  }
   return accounts;
 }
 

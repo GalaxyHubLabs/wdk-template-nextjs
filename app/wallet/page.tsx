@@ -18,7 +18,6 @@ import {
   Plus,
   RefreshCcw,
   Settings,
-  ShieldOff,
   Star,
   Trash2,
 } from "lucide-react";
@@ -529,34 +528,71 @@ export default function WalletPage() {
             </a>
           )}
 
-        {/* Primary actions */}
+        {/* Primary actions — Send / Receive / Swap (when on EVM) / History.
+            On non-EVM chains we fall back to a 3-column layout without the
+            Swap entry. The DeFi actions (Swap, Bridge) live up here next
+            to Send/Receive so they read as first-class wallet operations
+            instead of secondary cards. */}
         {activeAccount && (
-          <div className="grid grid-cols-3 gap-3">
+          <div
+            className={cn(
+              "grid gap-3",
+              chainSupportsApprovals(activeChain)
+                ? "grid-cols-4"
+                : "grid-cols-3",
+            )}
+          >
             <Link
               href="/wallet/send"
-              className={cn(
-                "flex h-12 items-center justify-center rounded-lg bg-brand text-brand-foreground font-medium transition-all hover:opacity-90 active:opacity-80",
-              )}
+              className="flex h-12 items-center justify-center rounded-lg bg-brand font-medium text-brand-foreground transition-all hover:opacity-90 active:opacity-80"
             >
               Send
             </Link>
             <Link
               href="/wallet/receive"
-              className={cn(
-                "flex h-12 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900 font-medium transition-all hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
-              )}
+              className="flex h-12 items-center justify-center rounded-lg bg-zinc-100 font-medium text-zinc-900 transition-all hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
             >
               Receive
             </Link>
+            {chainSupportsApprovals(activeChain) && (
+              <Link
+                href="/wallet/swap"
+                className="flex h-12 items-center justify-center gap-1.5 rounded-lg bg-zinc-100 font-medium text-zinc-900 transition-all hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <ArrowLeftRight size={14} /> Swap
+              </Link>
+            )}
             <Link
               href="/wallet/history"
-              className={cn(
-                "flex h-12 items-center justify-center gap-2 rounded-lg bg-zinc-100 text-zinc-900 font-medium transition-all hover:bg-zinc-200 active:bg-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
-              )}
+              className="flex h-12 items-center justify-center gap-1.5 rounded-lg bg-zinc-100 font-medium text-zinc-900 transition-all hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
             >
               <History size={14} /> History
             </Link>
           </div>
+        )}
+
+        {/* EVM-only secondary action: cross-chain USDT bridge. Lives in
+            its own row because it's a niche-but-powerful flow that
+            deserves space, and its row format reads as "click to learn
+            more / open dedicated UI" rather than as a one-tap action. */}
+        {activeAccount && chainSupportsApprovals(activeChain) && (
+          <Link
+            href="/wallet/bridge"
+            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
+                <NetworkIcon size={16} />
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-medium">Bridge USDT cross-chain</p>
+                <p className="text-xs text-zinc-500">
+                  USDT0 LayerZero bridge across EVM chains
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-zinc-400">→</span>
+          </Link>
         )}
 
         {/* Solana-only entry point into the collectibles view. Hidden on
@@ -581,71 +617,6 @@ export default function WalletPage() {
           </Link>
         )}
 
-        {/* EVM-only entry point: standing token approvals. Same row
-            visual treatment as Collectibles. */}
-        {activeAccount && chainSupportsApprovals(activeChain) && (
-          <Link
-            href="/wallet/approvals"
-            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
-                <ShieldOff size={16} />
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium">Token approvals</p>
-                <p className="text-xs text-zinc-500">
-                  Review and revoke standing ERC-20 authorisations
-                </p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400">→</span>
-          </Link>
-        )}
-
-        {/* EVM-only entry point: Velora swap. Same row visual
-            treatment as the rest. Hidden on Solana / TRON / TON
-            since Velora is EVM-only. */}
-        {activeAccount && chainSupportsApprovals(activeChain) && (
-          <Link
-            href="/wallet/swap"
-            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
-                <ArrowLeftRight size={16} />
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium">Swap tokens</p>
-                <p className="text-xs text-zinc-500">
-                  Powered by Tether&apos;s WDK Velora protocol module
-                </p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400">→</span>
-          </Link>
-        )}
-
-        {/* EVM-only entry point: cross-chain USDT bridge. */}
-        {activeAccount && chainSupportsApprovals(activeChain) && (
-          <Link
-            href="/wallet/bridge"
-            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
-                <NetworkIcon size={16} />
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-medium">Bridge USDT</p>
-                <p className="text-xs text-zinc-500">
-                  Cross-chain USDT via Tether&apos;s WDK USDT0 module
-                </p>
-              </div>
-            </div>
-            <span className="text-xs text-zinc-400">→</span>
-          </Link>
-        )}
 
         {/* Recent activity */}
         {activeAccount && (

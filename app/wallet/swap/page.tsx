@@ -17,6 +17,7 @@ import { Dropdown } from "@/components/ui/dropdown";
 import { Input } from "@/components/ui/input";
 import { CHAIN_CONFIGS, NETWORK_LABEL, networkSpec } from "@/lib/chains";
 import { getCustomTokens } from "@/lib/custom-tokens";
+import { formatUsd, toUsd } from "@/lib/prices";
 import { hasVault } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { formatBalance } from "@/lib/utils";
@@ -65,12 +66,21 @@ interface SwapAsset {
   /** ERC-20 contract address, or the Velora native sentinel. */
   address: string;
   logo?: string;
+  /** Available balance in chain-smallest units. 0n when the user
+   *  holds none of this asset (or we haven't fetched it yet). */
+  balance: bigint;
+  /** CoinGecko-style asset id used to look up the USD price. null
+   *  when this asset isn't priced (e.g. user-imported tokens). */
+  priceId: string | null;
 }
 
 export default function SwapPage() {
   const router = useRouter();
   const handle = useWalletStore((s) => s.handle);
   const activeChain = useWalletStore((s) => s.activeChain);
+  const nativeBalances = useWalletStore((s) => s.nativeBalances);
+  const tetherBalances = useWalletStore((s) => s.tetherBalances);
+  const prices = useWalletStore((s) => s.prices);
 
   const [step, setStep] = useState<Step>("form");
   const [fromKey, setFromKey] = useState<string>("native");
@@ -111,7 +121,9 @@ export default function SwapPage() {
   const supported = isSwapSupported(activeChain);
 
   // Available assets: native + every canonical Tether token + every
-  // custom token the user has imported for the active chain.
+  // custom token the user has imported for the active chain. Each
+  // entry carries the user's current balance + price id so the swap
+  // form can show balances and USD values inline.
   const assets = useMemo<SwapAsset[]>(() => {
     if (!supported) return [];
     const native: SwapAsset = {
@@ -121,6 +133,8 @@ export default function SwapPage() {
       decimals: config.nativeDecimals,
       address: NATIVE_SENTINEL,
       logo: config.logo,
+      balance: nativeBalances[activeChain] ?? 0n,
+      priceId: config.nativePriceId,
     };
     const tethers = spec.tetherTokens.map<SwapAsset>((t) => ({
       key: t.address,
@@ -129,6 +143,8 @@ export default function SwapPage() {
       decimals: t.decimals,
       address: t.address,
       logo: t.logo,
+      balance: tetherBalances[activeChain]?.[t.address] ?? 0n,
+      priceId: t.priceId,
     }));
     const customs = getCustomTokens(activeChain).map<SwapAsset>((t) => ({
       key: t.address,
@@ -137,9 +153,20 @@ export default function SwapPage() {
       decimals: t.decimals,
       address: t.address,
       logo: t.logo,
+      // Custom-token balances aren't subscribed to in the swap store
+      // slice; user can still type an amount they know they hold.
+      balance: 0n,
+      priceId: null,
     }));
     return [native, ...tethers, ...customs];
-  }, [supported, config, activeChain, spec.tetherTokens]);
+  }, [
+    supported,
+    config,
+    activeChain,
+    spec.tetherTokens,
+    nativeBalances,
+    tetherBalances,
+  ]);
 
   const fromAsset = assets.find((a) => a.key === fromKey) ?? assets[0];
   const toAsset =
@@ -316,60 +343,68 @@ export default function SwapPage() {
             </Button>
           </Card>
         ) : (
-          <Card className="space-y-4">
-            {/* From asset */}
-            <AssetField
-              label="From"
+          <Card className="space-y-2">
+            {/* From asset — single visual block: amount input on top,
+                asset picker + balance row below. Modelled on Uniswap /
+                Jupiter swap inputs so the asset and amount read as a
+                single "I'm trading X of Y" unit. */}
+            <SwapField
+              label="You pay"
               asset={fromAsset}
               assets={assets}
-              onChange={(key) => {
+              onChangeAsset={(key) => {
                 setFromKey(key);
                 setQuote(null);
                 if (toKey === key) setToKey("");
               }}
-            >
-              <Input
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setQuote(null);
-                  if (step === "review") setStep("form");
-                }}
-                placeholder="0.00"
-                className="font-mono"
-                disabled={step === "approving" || step === "swapping"}
-              />
-            </AssetField>
+              amountUnits={amountUnits}
+              amountInput={amount}
+              onAmountChange={(v) => {
+                setAmount(v);
+                setQuote(null);
+                if (step === "review") setStep("form");
+              }}
+              prices={prices}
+              inputDisabled={step === "approving" || step === "swapping"}
+              showMax
+            />
 
-            {/* Swap direction */}
-            <div className="flex items-center justify-center">
+            {/* Swap direction toggle — overlaps both fields like every
+                modern swap UI to read as "this is one trade, not two
+                disconnected steps". */}
+            <div className="relative flex items-center justify-center">
               <button
                 type="button"
                 onClick={swapAssets}
-                aria-label="Swap from and to"
-                className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-500 transition-colors hover:border-brand/40 hover:text-foreground dark:border-zinc-800 dark:bg-zinc-950"
+                aria-label="Flip from and to"
+                className="absolute z-10 rounded-full border-2 border-white bg-zinc-100 p-1.5 text-zinc-700 shadow-sm transition-colors hover:bg-zinc-200 dark:border-zinc-950 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
                 <ArrowDown size={14} />
               </button>
+              <span className="h-px w-full bg-zinc-100 dark:bg-zinc-800" />
             </div>
 
-            {/* To asset */}
-            <AssetField
-              label="To"
+            {/* To asset — same visual block, but the amount is a
+                read-only quote result rather than a typed input. */}
+            <SwapField
+              label="You receive"
               asset={toAsset}
               assets={assets.filter((a) => a.key !== fromKey)}
-              onChange={(key) => {
+              onChangeAsset={(key) => {
                 setToKey(key);
                 setQuote(null);
               }}
-            >
-              <div className="flex h-10 items-center rounded-md border border-zinc-200 px-3 font-mono text-sm text-zinc-500 dark:border-zinc-800">
-                {quote && toAsset
+              amountUnits={quote ? quote.tokenOutAmount : null}
+              amountInput={
+                quote && toAsset
                   ? formatBalance(quote.tokenOutAmount, toAsset.decimals)
-                  : "—"}
-              </div>
-            </AssetField>
+                  : ""
+              }
+              onAmountChange={() => {}}
+              prices={prices}
+              inputDisabled
+              readonlyOutput
+            />
 
             {/* Quote info */}
             {step === "review" && quote && fromAsset && toAsset && (
@@ -490,64 +525,129 @@ export default function SwapPage() {
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
-function AssetField({
+/**
+ * Single visual block for one side of a swap (You pay / You receive).
+ *
+ * Layout: a soft-grey card with the amount input on the right, the
+ * asset picker on the left, and a balance / USD value row underneath.
+ * Both sides of the swap use this same component so the input and
+ * output read as a symmetric pair.
+ */
+function SwapField({
   label,
   asset,
   assets,
-  onChange,
-  children,
+  onChangeAsset,
+  amountInput,
+  amountUnits,
+  onAmountChange,
+  prices,
+  inputDisabled,
+  showMax = false,
+  readonlyOutput = false,
 }: {
   label: string;
   asset: SwapAsset | null;
   assets: SwapAsset[];
-  onChange: (key: string) => void;
-  children: React.ReactNode;
+  onChangeAsset: (key: string) => void;
+  amountInput: string;
+  amountUnits: bigint | null;
+  onAmountChange: (value: string) => void;
+  prices: Record<string, number>;
+  inputDisabled: boolean;
+  showMax?: boolean;
+  readonlyOutput?: boolean;
 }) {
+  const usd =
+    asset && amountUnits != null
+      ? toUsd(amountUnits, asset.decimals, asset.priceId ? prices[asset.priceId] : undefined)
+      : null;
+
+  function setMax() {
+    if (!asset) return;
+    onAmountChange(formatBalance(asset.balance, asset.decimals));
+  }
+
   return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-        {label}
-      </label>
-      <div className="flex gap-2">
-        <div className="w-32 shrink-0">
-          {asset && (
-            <Dropdown
-              ariaLabel={`Select ${label.toLowerCase()} asset`}
-              value={asset.key}
-              onChange={onChange}
-              items={assets.map((a) => ({
-                value: a.key,
-                label: a.symbol,
-                sublabel: a.name,
-                leading: a.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={a.logo}
-                    alt={a.symbol}
-                    className="h-5 w-5 rounded-full bg-zinc-100 object-contain dark:bg-zinc-800"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 text-[9px] font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                    {a.symbol.slice(0, 2)}
-                  </div>
-                ),
-              }))}
-              triggerLeading={
-                asset.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={asset.logo}
-                    alt={asset.symbol}
-                    className="h-5 w-5 rounded-full bg-zinc-100 object-contain dark:bg-zinc-800"
-                    loading="lazy"
-                  />
-                ) : undefined
-              }
-            />
-          )}
-        </div>
-        <div className="flex-1">{children}</div>
+    <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 transition-colors focus-within:border-brand/40 dark:border-zinc-800 dark:bg-zinc-900/40">
+      <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+        <span>{label}</span>
+        {asset && (
+          <span>
+            Balance:{" "}
+            <span className="font-mono text-foreground">
+              {formatBalance(asset.balance, asset.decimals)}
+            </span>{" "}
+            {asset.symbol}
+          </span>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        {asset ? (
+          <Dropdown
+            ariaLabel={`Select ${label.toLowerCase()} asset`}
+            value={asset.key}
+            onChange={onChangeAsset}
+            items={assets.map((a) => ({
+              value: a.key,
+              label: a.symbol,
+              sublabel: a.name,
+              leading: a.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={a.logo}
+                  alt={a.symbol}
+                  className="h-5 w-5 rounded-full bg-zinc-100 object-contain dark:bg-zinc-800"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 text-[9px] font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                  {a.symbol.slice(0, 2)}
+                </div>
+              ),
+              trailing: (
+                <span className="font-mono text-[11px] text-zinc-500">
+                  {formatBalance(a.balance, a.decimals)}
+                </span>
+              ),
+            }))}
+            triggerLeading={
+              asset.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={asset.logo}
+                  alt={asset.symbol}
+                  className="h-5 w-5 rounded-full bg-zinc-100 object-contain dark:bg-zinc-800"
+                  loading="lazy"
+                />
+              ) : undefined
+            }
+            buttonClassName="h-10 bg-white dark:bg-zinc-950"
+          />
+        ) : (
+          <div className="h-10 w-32 rounded-md border border-zinc-200 dark:border-zinc-800" />
+        )}
+        <Input
+          inputMode="decimal"
+          value={amountInput}
+          onChange={(e) => onAmountChange(e.target.value)}
+          placeholder="0.00"
+          disabled={inputDisabled}
+          className="h-10 flex-1 border-none bg-transparent text-right font-mono text-xl shadow-none focus-visible:ring-0"
+          readOnly={readonlyOutput}
+        />
+      </div>
+      <div className="mt-1.5 flex items-center justify-between text-[11px] text-zinc-500">
+        <span>{usd != null ? formatUsd(usd) : "—"}</span>
+        {showMax && asset && asset.balance > 0n && (
+          <button
+            type="button"
+            onClick={setMax}
+            className="rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 transition-colors hover:border-brand/40 hover:text-foreground dark:border-zinc-800 dark:text-zinc-300"
+          >
+            Max
+          </button>
+        )}
       </div>
     </div>
   );

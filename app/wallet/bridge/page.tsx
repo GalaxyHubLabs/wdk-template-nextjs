@@ -22,6 +22,7 @@ import {
   type ChainId,
 } from "@/lib/chains";
 import { looksLikeName, resolveName } from "@/lib/name-resolution";
+import { formatUsd, toUsd } from "@/lib/prices";
 import { hasVault } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { formatBalance, truncate } from "@/lib/utils";
@@ -74,6 +75,8 @@ export default function BridgePage() {
   const router = useRouter();
   const handle = useWalletStore((s) => s.handle);
   const activeChain = useWalletStore((s) => s.activeChain);
+  const tetherBalances = useWalletStore((s) => s.tetherBalances);
+  const prices = useWalletStore((s) => s.prices);
 
   const [step, setStep] = useState<Step>("form");
   const [targetChain, setTargetChain] = useState<ChainId | "">("");
@@ -331,24 +334,32 @@ export default function BridgePage() {
             </Button>
           </Card>
         ) : (
-          <Card className="space-y-4">
-            {/* Source → target chain row */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+          <Card className="space-y-3">
+            {/* Source → target chain route. Bigger visual block so the
+                cross-chain nature of the action reads at a glance. */}
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                 Route
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="flex flex-1 items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800">
+              </p>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex flex-1 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={sourceConfig.logo}
                     alt={sourceConfig.label}
-                    className="h-5 w-5 rounded-full bg-zinc-100 dark:bg-zinc-800"
+                    className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800"
                     loading="lazy"
                   />
-                  <span className="text-sm">{sourceConfig.label}</span>
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <p className="truncate text-sm font-medium">
+                      {sourceConfig.label}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                      From
+                    </p>
+                  </div>
                 </div>
-                <ArrowRight size={14} className="text-zinc-400" />
+                <ArrowRight size={16} className="shrink-0 text-zinc-400" />
                 <div className="flex-1">
                   <Dropdown
                     ariaLabel="Destination chain"
@@ -383,35 +394,86 @@ export default function BridgePage() {
                         <img
                           src={targetConfig.logo}
                           alt={targetConfig.label}
-                          className="h-5 w-5 rounded-full bg-zinc-100 dark:bg-zinc-800"
+                          className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800"
                           loading="lazy"
                         />
                       ) : (
                         <NetworkIcon size={14} />
                       )
                     }
+                    buttonClassName="h-12 bg-white dark:bg-zinc-950"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Amount */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Amount (USDT)
-              </label>
-              <Input
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setQuote(null);
-                  if (step === "review") setStep("form");
-                }}
-                placeholder="0.00"
-                className="font-mono"
-                disabled={step === "approving" || step === "bridging"}
-              />
+            {/* Amount + USDT balance pair. Single visual block with the
+                balance + Max affordance built in, mirroring the swap
+                page's SwapField. */}
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                <span>You send</span>
+                {(() => {
+                  const usdtBal =
+                    tetherBalances[activeChain]?.[usdt.address] ?? 0n;
+                  return (
+                    <span>
+                      Balance:{" "}
+                      <span className="font-mono text-foreground">
+                        {formatBalance(usdtBal, usdt.decimals)}
+                      </span>{" "}
+                      USDT
+                    </span>
+                  );
+                })()}
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex h-12 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 dark:border-zinc-800 dark:bg-zinc-950">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={usdt.logo}
+                    alt="USDT"
+                    className="h-6 w-6 rounded-full"
+                    loading="lazy"
+                  />
+                  <span className="text-sm font-medium">USDT</span>
+                </div>
+                <Input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    setQuote(null);
+                    if (step === "review") setStep("form");
+                  }}
+                  placeholder="0.00"
+                  disabled={step === "approving" || step === "bridging"}
+                  className="h-12 flex-1 border-none bg-transparent text-right font-mono text-xl shadow-none focus-visible:ring-0"
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-zinc-500">
+                <span>
+                  {amountUnits != null
+                    ? formatUsd(
+                        toUsd(amountUnits, usdt.decimals, prices[usdt.priceId]),
+                      )
+                    : "—"}
+                </span>
+                {(tetherBalances[activeChain]?.[usdt.address] ?? 0n) > 0n && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const bal =
+                        tetherBalances[activeChain]?.[usdt.address] ?? 0n;
+                      setAmount(formatBalance(bal, usdt.decimals));
+                      setQuote(null);
+                    }}
+                    className="rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 transition-colors hover:border-brand/40 hover:text-foreground dark:border-zinc-800 dark:text-zinc-300"
+                  >
+                    Max
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Recipient */}

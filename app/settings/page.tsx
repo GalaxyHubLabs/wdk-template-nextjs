@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Server,
   ShieldAlert,
+  ShieldOff,
   Sun,
   Trash2,
 } from "lucide-react";
@@ -826,6 +827,30 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium">Address book</p>
                 <p className="text-xs text-zinc-500">
                   Saved recipients across every chain
+                </p>
+              </div>
+            </div>
+            <ArrowLeft size={16} className="rotate-180 text-zinc-400" />
+          </div>
+        </Link>
+
+        {/* Token approvals shortcut — security maintenance, not a daily
+            action, so it lives here rather than on the wallet dashboard.
+            EVM-only; the page itself surfaces a clear empty state on
+            other chains. */}
+        <Link
+          href="/wallet/approvals"
+          className="block rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-900">
+                <ShieldOff size={16} />
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-medium">Token approvals</p>
+                <p className="text-xs text-zinc-500">
+                  Review and revoke standing ERC-20 authorisations (EVM)
                 </p>
               </div>
             </div>
