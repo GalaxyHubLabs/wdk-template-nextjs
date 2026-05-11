@@ -392,7 +392,7 @@ export default function SettingsPage() {
                 aria-checked={balanceHidden}
                 onClick={() => setBalanceHidden(!balanceHidden)}
                 className={cn(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
                   balanceHidden ? "bg-brand" : "bg-zinc-200 dark:bg-zinc-800",
                 )}
               >
@@ -427,7 +427,7 @@ export default function SettingsPage() {
                   onClick={() => void toggleBiometric()}
                   disabled={biometricBusy}
                   className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
                     biometricOn ? "bg-brand" : "bg-zinc-200 dark:bg-zinc-800",
                   )}
                 >
