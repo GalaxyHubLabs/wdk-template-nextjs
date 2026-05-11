@@ -6,19 +6,19 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=flat-square)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square)](https://www.typescriptlang.org)
 [![Tailwind v4](https://img.shields.io/badge/Tailwind-v4-38bdf8?style=flat-square)](https://tailwindcss.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](#-license)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](#license)
 
 ---
 
-## 🎬 Live demo
+## Live demo
 
-> **Demo URL added when deployed to Vercel.** Run locally in the meantime — see [Quick start](#-quick-start).
+> **Demo URL added when deployed to Vercel.** Run locally in the meantime — see [Quick start](#quick-start).
 
-Once deployed, the wallet is also a runnable MCP server: any Claude Desktop user can drive its read surface with five lines of config. See [`/agents`](app/agents/page.tsx) once the site is live, or [Built for AI agents](#-built-for-ai-agents) below.
+Once deployed, the wallet is also a runnable MCP server: any standards-compliant MCP client can drive its read surface against the live endpoint. See [`/agents`](app/agents/page.tsx) once the site is live, or [Built for AI agents](#built-for-ai-agents) below.
 
 ---
 
-## ✨ Everything that ships
+## What ships
 
 A complete, opinionated wallet that demonstrates how far the WDK gets you without writing chain-specific code.
 
@@ -39,86 +39,88 @@ A complete, opinionated wallet that demonstrates how far the WDK gets you withou
 
 The same `WalletManagerEvm` is registered under five different chain ids with different RPCs — exactly the pattern the WDK docs recommend for EVM L2s. Adding another L2 is a one-entry change in [`lib/chains.ts`](lib/chains.ts) + one `.registerWallet()` call in [`lib/wdk-client.ts`](lib/wdk-client.ts).
 
-### Onboarding & vault
+### Onboarding and vault
 
-- ✅ **Create wallet** — 3-step flow (password → reveal 12-word seed → confirm backup).
-- ✅ **Import wallet** — numbered 12/24-word grid with paste-anywhere fan-out.
-- ✅ **Unlock screen** — password → AES-GCM decrypt → resume.
-- ✅ **Biometric unlock** — Touch ID / Face ID / Windows Hello via WebAuthn PRF (Chrome 116+, Edge 116+, Safari TP 17+). Password remains required for the very first unlock after a wipe.
-- ✅ **Encrypted local vault** — AES-GCM with 250,000-iteration PBKDF2, all via WebCrypto. Stored in `localStorage`, **never** sent anywhere.
-- ✅ **Recovery phrase backup** — Settings → password gate → tap-to-reveal grid → copy.
-- ✅ **Wipe** — irreversibly clears the vault and every derived state on this device.
+- **Create wallet** — 3-step flow (password → reveal 12-word seed → confirm backup).
+- **Import wallet** — numbered 12/24-word grid with paste-anywhere fan-out.
+- **Unlock screen** — password → AES-GCM decrypt → resume.
+- **Biometric unlock** — Touch ID, Face ID, or Windows Hello via WebAuthn PRF (Chrome 116+, Edge 116+, Safari TP 17+). Password remains required for the very first unlock after a wipe.
+- **Encrypted local vault** — AES-GCM with 250,000-iteration PBKDF2, all via WebCrypto. Stored in `localStorage`, never sent anywhere.
+- **Recovery phrase backup** — Settings → password gate → tap-to-reveal grid → copy.
+- **Wipe** — irreversibly clears the vault and every derived state on this device.
 
 ### Networks
 
-- ✅ **Mainnet / Testnet toggle** — global, applies to every chain. Switching tears down the WDK and re-binds to the new RPCs.
-- ✅ **Per-network faucet shortcuts** — surfaced on `/wallet` whenever a testnet account has a zero balance.
-- ✅ **Custom RPC editor** — Settings → Networks lets the user paste a Helius / Alchemy / QuickNode / Triton URL per chain × network. Changes propagate through `networkSpec()` on the next wallet open.
+- **Mainnet / Testnet toggle** — global, applies to every chain. Switching tears down the WDK and re-binds to the new RPCs.
+- **Per-network faucet shortcuts** — surfaced on `/wallet` whenever a testnet account has a zero balance.
+- **Custom RPC editor** — Settings → Networks lets the user paste a Helius, Alchemy, QuickNode, or Triton URL per chain × network. Changes propagate through `networkSpec()` on the next wallet open.
 
 ### Multi-account
 
-- ✅ **BIP-44 account index** — tracked on the `WalletHandle`.
-- ✅ **Dynamic account list** — create, rename, delete (UI only — the BIP-44 math always derives the same address for a given index).
-- ✅ **`/settings/add-account`** picker with five options: Create new ✅ · Import recovery phrase ✅ · Watch any address ✅ · Connect hardware wallet (Soon) · Import private key (Soon).
-- ✅ **Watch-only addresses** across all nine chains via raw RPC. Read-only — no keys held, no signing surface.
+- **BIP-44 account index** — tracked on the `WalletHandle`.
+- **Dynamic account list** — create, rename, delete (UI only — the BIP-44 math always derives the same address for a given index).
+- **`/settings/add-account`** picker with five options: Create new, Import recovery phrase, Watch any address (ready); Connect hardware wallet, Import private key (coming soon).
+- **Watch-only addresses** across all nine chains via raw RPC. Read-only — no keys held, no signing surface.
 
 ### Tokens
 
-- ✅ Canonical Tether tokens on every supported chain × network (USDT on every mainnet that has it, XAUt on Ethereum + TRON).
-- ✅ **Send any token** — native or ERC-20 / SPL / TRC-20 / jetton — via WDK's uniform `account.transfer({ token, recipient, amount })`.
-- ✅ **Custom token import** with **Jupiter auto-fetch** on Solana (paste a mint, get symbol + decimals + logo).
-- ✅ **Pinned (favorite) tokens** — star a token to keep it at the top of the list across reloads.
-- ✅ **24-hour price change** badges (green/red) next to every USD value.
+- Canonical Tether tokens on every supported chain × network (USDT on every mainnet that has it, XAUt on Ethereum and TRON).
+- **Send any token** — native or ERC-20 / SPL / TRC-20 / jetton — via WDK's uniform `account.transfer({ token, recipient, amount })`.
+- **Custom token import** with **Jupiter auto-fetch** on Solana (paste a mint, get symbol, decimals, and logo).
+- **Pinned (favorite) tokens** — star a token to keep it at the top of the list across reloads.
+- **24-hour price change** badges (green / red) next to every USD value.
 
-### Send / Receive / History
+### Send, receive, history
 
-- ✅ **Send flow** — form → fee quote → review → execute → success. Native + tokens. Insufficient-gas warning separate from insufficient-asset.
-- ✅ **ENS / SNS resolution** — `.eth` on every EVM chain, `.sol` on Solana. Debounced 350 ms, resolved address rendered as a preview, kept on the review screen.
-- ✅ **Recent recipients** — last 8 destinations per chain, surfaced as one-click chips alongside the address book.
-- ✅ **First-send-to-new-address warning** — explicit acknowledgement checkbox before review.
-- ✅ **Receive page** with QR + chain-aware payment URI (Solana Pay / EIP-681 / `tron:` / `ton://transfer/`). Asset + amount selector builds a wallet-scannable charge link.
-- ✅ **Activity history** — Solana via JSON-RPC, EVM family via Etherscan-compatible APIs. Grouped by day (Today / Yesterday / specific date), direction-aware icons, status pills.
-- ✅ **Address book** — per-chain CRUD with ENS / SNS resolution on save and one-click chips in the send form.
+- **Send flow** — form → fee quote → review → execute → success. Native + tokens. Insufficient-gas warning separate from insufficient-asset.
+- **ENS / SNS resolution** — `.eth` on every EVM chain, `.sol` on Solana. Debounced 350 ms, resolved address rendered as a preview, kept on the review screen.
+- **Recent recipients** — last 8 destinations per chain, surfaced as one-click chips alongside the address book.
+- **First-send-to-new-address warning** — explicit acknowledgement checkbox before review.
+- **Receive page** with QR + chain-aware payment URI (Solana Pay, EIP-681, `tron:`, `ton://transfer/`). Asset + amount selector builds a wallet-scannable charge link.
+- **Activity history** — Solana via JSON-RPC, EVM family via Etherscan-compatible APIs. Grouped by day (Today / Yesterday / specific date), direction-aware icons, status pills.
+- **Address book** — per-chain CRUD with ENS / SNS resolution on save and one-click chips in the send form.
 
-### Signing & security
+### Signing and security
 
-- ✅ **Sign arbitrary message** — `/wallet/sign` exposes WDK's uniform `account.sign(message)` for every chain. Useful for SIWE / SIWS, attestations, off-chain order books.
-- ✅ **Token approvals page** (`/wallet/approvals`) — scans the last ~10k blocks for Approval events on EVM chains, lists every standing allowance with current value resolved on-chain, one-click revoke via WDK's `account.approve(amount: 0n)`. Unlimited approvals flagged in red.
-- ✅ **Auto-lock** — Settings → Privacy preset selector (Off / 5 / 15 / 30 / 60 min). Mouse, keyboard, touch, scroll, and visibility-state events all count as activity.
-- ✅ **Hide-balances toggle** — global `••••` masking, persisted per device.
+- **Sign arbitrary message** — `/wallet/sign` exposes WDK's uniform `account.sign(message)` for every chain. Useful for SIWE / SIWS, attestations, off-chain order books.
+- **Token approvals page** (`/wallet/approvals`) — scans the last ~10k blocks for Approval events on EVM chains, lists every standing allowance with current value resolved on-chain, one-click revoke via WDK's `account.approve(amount: 0n)`. Unlimited approvals flagged in red.
+- **Auto-lock** — Settings → Privacy preset selector (Off / 5 / 15 / 30 / 60 min). Mouse, keyboard, touch, scroll, and visibility-state events all count as activity.
+- **Hide-balances toggle** — global `••••` masking, persisted per device.
 
 ### NFTs
 
-- ✅ **Solana collectibles** (`/wallet/collectibles`) — Metaplex DAS via `getAssetsByOwner` on the configured RPC. Graceful degradation with an in-app CTA to plug a DAS-capable provider.
+- **Solana collectibles** (`/wallet/collectibles`) — Metaplex DAS via `getAssetsByOwner` on the configured RPC. Graceful degradation with an in-app CTA to plug a DAS-capable provider.
 
-### Portfolio & prices
+### Portfolio and prices
 
-- ✅ Portfolio total in USD on the wallet headline (`$X.XX across N chains · Network`).
-- ✅ Per-balance USD value below every amount.
-- ✅ CoinGecko free-tier price feed with 60s in-memory cache. `priceChanges` slice for the 24h delta. Includes `matic-network` for Polygon's native.
+- Portfolio total in USD on the wallet headline (`$X.XX across N chains · Network`).
+- Per-balance USD value below every amount.
+- CoinGecko free-tier price feed with 60-second in-memory cache. `priceChanges` slice for the 24h delta. Includes `matic-network` for Polygon's native.
 
-### Identity & UX
+### Identity and UX
 
-- ✅ **Deterministic address avatars** — pure SVG gradient driven by a hash of the address. Same address always paints the same picture.
-- ✅ **Real chain logos** from Trustwallet — never text initials.
-- ✅ **Real Tether logo** for USDT + XAUt rows.
-- ✅ **Tether teal brand** (`#009393` / `#1FBFA8`) baked in as CSS vars (`--brand`, `--brand-foreground`, `--brand-soft`).
-- ✅ **Three-state theme toggle** (system / light / dark) with pre-React inline script to avoid FOUC.
-- ✅ **Skeleton loaders** wherever a value is in flight — no more `—` placeholders.
-- ✅ **⌘K command palette** — global jump-to-anything overlay, fuzzy filter, keyboard-driven.
-- ✅ **Toast notifications** — zustand-driven, used in every async flow.
-- ✅ **PWA manifest** + favicon + apple-touch-icon + Open Graph image — all generated via `next/og`. No binary assets in the repo.
+- **Deterministic address avatars** — pure SVG gradient driven by a hash of the address. Same address always paints the same picture.
+- **Real chain logos** from Trustwallet — never text initials.
+- **Real Tether logo** for USDT and XAUt rows.
+- **Tether teal brand** (`#009393` / `#1FBFA8`) baked in as CSS vars (`--brand`, `--brand-foreground`, `--brand-soft`).
+- **Three-state theme toggle** (system / light / dark) with pre-React inline script to avoid FOUC.
+- **Skeleton loaders** wherever a value is in flight — no more `—` placeholders.
+- **Cmd-K command palette** — global jump-to-anything overlay, fuzzy filter, keyboard-driven.
+- **Toast notifications** — Zustand-driven, used in every async flow.
+- **PWA manifest** + favicon + apple-touch-icon + Open Graph image — all generated via `next/og`. No binary assets in the repo.
 
 ### Documentation surfaces
 
-- ✅ **`/agents`** — in-app walk-through for plugging the wallet's MCP server into Claude Desktop.
-- ✅ **`examples/agent-send-usdt.ts`** — runnable TypeScript script that opens the wallet from a seed in `SEED_PHRASE` env, quotes a USDT transfer, sends it, prints the explorer link. Works on any of the nine chains by changing one constant.
+- **`/agents`** — in-app walk-through for plugging the wallet's MCP server into any MCP-aware client.
+- **`examples/agent-send-usdt.ts`** — runnable TypeScript script that opens the wallet from a seed in `SEED_PHRASE` env, quotes a USDT transfer, sends it, and prints the explorer link. Works on any of the nine chains by changing one constant.
 
 ---
 
-## 🤖 Built for AI agents
+## Built for AI agents
 
-The killer differentiator: this template ships a **built-in Model Context Protocol server** at `/api/mcp`. Any MCP-aware client (Claude Desktop, the Anthropic API's MCP client, custom agent runtimes) gets six read tools out of the box:
+The same `@tetherto/wdk` integration that powers the wallet UI is exposed to AI agents through an open [Model Context Protocol](https://modelcontextprotocol.io) server at `/api/mcp`. Same chains, same RPCs, same address resolution. Zero glue code, zero seed exposure.
+
+### Tools the MCP server exposes
 
 | Tool | What it does |
 | --- | --- |
@@ -129,9 +131,54 @@ The killer differentiator: this template ships a **built-in Model Context Protoc
 | `get_token_metadata` | ERC-20 `symbol()` / `decimals()` / `name()` via `eth_call`. |
 | `get_recent_transactions` | Last N transactions normalised to a common shape. |
 
-### Wire it into Claude Desktop in five lines
+Compatible with any MCP client — Claude Desktop, Cursor, Continue, Cline, Windsurf, or your own runtime.
 
-Paste this into your `claude_desktop_config.json`:
+### TypeScript — direct WDK usage from an agent
+
+The cleanest integration goes straight through `lib/wdk-client.ts` — the same module the UI uses:
+
+```ts
+import { openWallet, sendToken } from "@/lib/wdk-client";
+import { networkSpec } from "@/lib/chains";
+
+const wdk = await openWallet(seed, "mainnet");
+
+const usdt = networkSpec("polygon", "mainnet")
+  .tetherTokens.find((t) => t.symbol === "USDT")!;
+
+await sendToken(wdk, "polygon", usdt.address, recipient, 100_000_000n);
+```
+
+The repo ships a runnable example of this pattern in [`examples/agent-send-usdt.ts`](examples/agent-send-usdt.ts). Set `SEED_PHRASE`, `RECIPIENT`, `AMOUNT_USDT` and `npx tsx examples/agent-send-usdt.ts` — it opens the wallet, quotes the fee, sends, prints the explorer link.
+
+### HTTP — probe the server with curl
+
+The MCP endpoint speaks JSON-RPC 2.0 over HTTP. No SDK required:
+
+```bash
+# Manifest
+curl https://your-domain/api/mcp
+
+# Call a tool
+curl -X POST https://your-domain/api/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_balance",
+      "arguments": {
+        "chain": "polygon",
+        "address": "0xabc...def"
+      }
+    }
+  }'
+```
+
+### MCP clients — example configuration
+
+For desktop clients that read a JSON config file, the registration is the same shape across vendors. The example below targets Claude Desktop's `claude_desktop_config.json`, but the inner block transposes to Cursor / Continue / Cline:
 
 ```json
 {
@@ -139,51 +186,37 @@ Paste this into your `claude_desktop_config.json`:
     "wdk-wallet": {
       "transport": {
         "type": "http",
-        "url": "https://<your-deployment>/api/mcp"
+        "url": "https://your-domain/api/mcp"
       }
     }
   }
 }
 ```
 
-Restart Claude Desktop. The wallet's tools then appear under the `wdk-wallet` server in any conversation.
+The `wdk-wallet` key is the server name that shows up in the client's UI — rename it to whatever your fork prefers.
 
-### Signing & sending (the write path)
+### Read vs write
 
-The MCP server is read-only by design — the seed phrase never leaves the user's device, so a stateless web server can't sign. For agents that need to **move funds**, the repo ships [`examples/agent-send-usdt.ts`](examples/agent-send-usdt.ts) — a 130-line standalone script that loads a seed from `SEED_PHRASE`, opens the wallet through `lib/wdk-client.ts`, and sends USDT on any of the nine chains.
-
-```bash
-export SEED_PHRASE="your twelve testnet words go here"
-export RECIPIENT="<solana-or-evm-address>"
-export AMOUNT_USDT="1.5"
-npx tsx examples/agent-send-usdt.ts
-```
-
-Wire that pattern into your agent runtime when you need state-changing operations.
+The MCP server is **read-only** by design — the seed phrase never leaves the user's device, so a stateless web server cannot sign. For agents that need to move funds, run the TypeScript example above (or any equivalent) in a context that owns the seed. The split keeps the open MCP surface trustless and pushes signing to environments the operator controls.
 
 ---
 
-## 🚀 Quick start
+## Quick start
 
 ```bash
-# 1. Clone
 git clone https://github.com/GalaxyHubLabs/wdk-template-nextjs.git
 cd wdk-template-nextjs
-
-# 2. Install
 npm install
-
-# 3. Dev server (Next.js 16 / Turbopack)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Click **Create new wallet**, set a password, save your seed phrase, and you land on a working multi-chain wallet — the default network is **testnet** so a first-time run can't burn real funds.
+Open [http://localhost:3000](http://localhost:3000). Click **Create new wallet**, set a password, save your seed phrase, and you land on a working multi-chain wallet — the default network is **testnet** so a first-time run cannot burn real funds.
 
 Need testnet SOL? The wallet surfaces the [Solana faucet](https://faucet.solana.com/) shortcut whenever your balance is zero on devnet.
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 Every default works out of the box for local testing. For production deployments, drop RPCs and (optionally) custom token addresses into `.env.local`:
 
@@ -205,14 +238,14 @@ NEXT_PUBLIC_EVM_RPC_MAINNET=https://eth.llamarpc.com
 NEXT_PUBLIC_EVM_RPC_TESTNET=https://sepolia.drpc.org
 NEXT_PUBLIC_BSC_RPC_MAINNET=https://bsc-dataseed.binance.org
 NEXT_PUBLIC_POLYGON_RPC_MAINNET=https://polygon-rpc.com
-# … see lib/chains.ts for the full list
+# See lib/chains.ts for the full list.
 ```
 
 Compatible with [Helius](https://www.helius.dev), [Triton](https://triton.one), [QuickNode](https://www.quicknode.com), [Alchemy](https://www.alchemy.com), and any standards-compliant RPC. **End users can override these without redeploying** via Settings → Networks → tap a chain → paste their URL. Overrides persist to `localStorage`.
 
 ---
 
-## 🧩 Architecture
+## Architecture
 
 ```
                 ┌───────────────────────────────────────────┐
@@ -250,24 +283,24 @@ Compatible with [Helius](https://www.helius.dev), [Triton](https://triton.one), 
 └─────┘ └─────────────┘ └─────────┘ └──────────┘ └────────────┘
 ```
 
-### Built _on_ WDK, not _around_ it
+### Built on WDK, not around it
 
 A core architectural principle of this template — and a deliberate point of credibility for the bounty review — is that **every wallet operation goes through the WDK SDK as the contract intends**.
 
 Concretely, in [`lib/wdk-client.ts`](lib/wdk-client.ts):
 
 ```ts
-await account.transfer({ token, recipient, amount });     // token send
-await account.sendTransaction({ to, value });             // native send
-await account.approve({ token, spender, amount });        // revoke approval
-await account.sign(message);                              // sign message
-await account.quoteTransfer({ token, recipient, amount }); // fee quote
-await account.quoteSendTransaction({ to, value });        // native fee quote
+await account.transfer({ token, recipient, amount });       // token send
+await account.sendTransaction({ to, value });               // native send
+await account.approve({ token, spender, amount });          // revoke approval
+await account.sign(message);                                // sign message
+await account.quoteTransfer({ token, recipient, amount });  // fee quote
+await account.quoteSendTransaction({ to, value });          // native fee quote
 ```
 
 Every chain registers its own `WalletManager` via `WdkManager.registerWallet(...)`. Derivation, signing, nonce management, chain-specific encoding — **all of it is the SDK's job**, this template just orchestrates the calls.
 
-Three places intentionally talk to raw RPC instead, and the reason is the same in each: WDK doesn't expose that read shape, so there's no contract to honour.
+Three places intentionally talk to raw RPC instead, and the reason is the same in each: WDK does not expose that read shape, so there is no contract to honour.
 
 - [`lib/watch-balances.ts`](lib/watch-balances.ts) reads balances for arbitrary addresses (watch-only entries have no seed registered with WDK).
 - [`lib/approvals.ts`](lib/approvals.ts) scans `eth_getLogs` for Approval events — WDK exposes `approve()` for the write path but no list endpoint for the read path.
@@ -277,13 +310,13 @@ Each of those paths is documented inline so a reviewer can confirm at a glance t
 
 ### Layering rationale
 
-- **`lib/wdk-client.ts` is the only seed-aware module.** Everything else (pages, store, address book, watch list) talks to it through typed helpers. An AI agent that wants to drive the wallet doesn't need to touch React.
+- **`lib/wdk-client.ts` is the only seed-aware module.** Everything else (pages, store, address book, watch list) talks to it through typed helpers. An AI agent that wants to drive the wallet does not need to touch React.
 - **State (`store/wallet.ts`) is in-memory only.** Persistence lives in `localStorage` via dedicated modules: `lib/storage.ts` for the encrypted vault, `lib/accounts.ts` for the account list, `lib/watch-list.ts` for watch-only entries, `lib/address-book.ts`, `lib/recent-recipients.ts`, `lib/token-favorites.ts`, `lib/rpc-overrides.ts`, `lib/biometric.ts`.
 - **Per-chain RPC overrides** are applied inline at `networkSpec()` lookup time. Every existing call site — `openWallet`'s WDK registrations, the watch-only balance fetcher, the explorer URL builders — picks up the override without a per-callsite change.
 
 ---
 
-## 🔐 Security model
+## Security model
 
 | Concern | How the template handles it |
 | --- | --- |
@@ -299,7 +332,7 @@ The template has **no backend**. There is no API to phish, no database to breach
 
 ---
 
-## 🛠️ Project structure
+## Project structure
 
 ```
 app/
@@ -313,7 +346,7 @@ app/
   agents/page.tsx                AI-agent setup walk-through (MCP)
   api/mcp/route.ts               MCP JSON-RPC 2.0 over HTTP server
   onboarding/create/page.tsx     3-step wallet creation
-  onboarding/import/page.tsx     12/24-word import
+  onboarding/import/page.tsx     12 / 24-word import
   unlock/page.tsx                Password + biometric unlock
   settings/page.tsx              Appearance, Privacy/Security, Accounts, Backup, Networks/RPCs, Danger zone
   settings/add-account/page.tsx  5-option picker (Create / Import / Watch / Hardware-soon / PK-soon)
@@ -325,7 +358,7 @@ app/
   wallet/sign/page.tsx           Arbitrary-message signing
   wallet/approvals/page.tsx      ERC-20 approval explorer + revoker
   wallet/collectibles/page.tsx   Solana NFTs via Metaplex DAS
-  wallet/addresses/page.tsx      Address book with ENS/SNS resolution
+  wallet/addresses/page.tsx      Address book with ENS / SNS resolution
   wallet/tokens/add/page.tsx     Custom token import + Jupiter auto-fetch (Solana)
   watch/[id]/page.tsx            Read-only view for a watched address
 
@@ -337,7 +370,7 @@ components/
   ui/input.tsx                   Input + Textarea
   ui/skeleton.tsx                Animated pulse placeholder
   auto-lock.tsx                  Idle timeout watcher (mounted at layout)
-  command-palette.tsx            ⌘K global jump-to-anything overlay
+  command-palette.tsx            Cmd-K global jump-to-anything overlay
   theme.tsx                      Three-state theme toggle + pre-React init
   toast.tsx                      Toaster component
 
@@ -374,7 +407,7 @@ next.config.ts                   sodium-native → sodium-javascript alias for b
 
 ---
 
-## ➕ Adding another chain
+## Adding another chain
 
 WDK ships separate wallet modules per chain. Adding a new EVM L2 or a non-EVM ecosystem is a three-step change:
 
@@ -384,15 +417,15 @@ WDK ships separate wallet modules per chain. Adding a new EVM L2 or a non-EVM ec
    npm install @tetherto/wdk-wallet-<chain>
    ```
 
-2. **Add the chain to `lib/chains.ts`** — extend the `ChainId` union, add an entry to `CHAIN_CONFIGS` with the mainnet / testnet RPC + explorer + USDT contract (if any), and include the id in `CHAIN_IDS`.
+2. **Add the chain to `lib/chains.ts`** — extend the `ChainId` union, add an entry to `CHAIN_CONFIGS` with the mainnet / testnet RPC, explorer, and USDT contract (if any), and include the id in `CHAIN_IDS`.
 
 3. **Register the wallet in `lib/wdk-client.ts::openWallet`** — one new `.registerWallet(id, manager, { provider })` line on the WDK orchestrator.
 
-That's it. Every page in the wallet — dashboard, send, receive, history, watch-only, MCP tools — picks up the new chain automatically because they all iterate `CHAIN_IDS`. The vault, onboarding, and unlock screens are chain-agnostic.
+That is it. Every page in the wallet — dashboard, send, receive, history, watch-only, MCP tools — picks up the new chain automatically because they all iterate `CHAIN_IDS`. The vault, onboarding, and unlock screens are chain-agnostic.
 
 ---
 
-## 🧪 Tech stack
+## Tech stack
 
 - [Next.js 16](https://nextjs.org) (App Router + Turbopack)
 - [TypeScript](https://www.typescriptlang.org) — strict mode, ES2020 target
@@ -406,9 +439,9 @@ That's it. Every page in the wallet — dashboard, send, receive, history, watch
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-Features the template architecture is ready for but doesn't yet ship:
+Features the template architecture is ready for but does not yet ship:
 
 - **Other framework variants** — Vue, Svelte, Angular, and Flutter implementations of the same template are on the roadmap.
 - **Bitcoin** support once `@tetherto/wdk-wallet-bitcoin` lands on npm. The "Coming soon" placeholder in the chain selector already points there.
@@ -417,18 +450,18 @@ Features the template architecture is ready for but doesn't yet ship:
 - **Private key import** as a fifth account type.
 - **Cross-chain swap** (Jupiter on Solana, LI.FI / Across for EVM ↔ EVM).
 - **EVM NFT listing** (ERC-721 / ERC-1155 collectibles, mirroring the Solana DAS implementation).
-- **TRC-20 / jetton balances in the watch-only view** (currently link out to the chain explorer).
+- **TRC-20 and jetton balances in the watch-only view** (currently link out to the chain explorer).
 
 ---
 
-## ⚖️ License
+## License
 
 [MIT](LICENSE) — fork it, rebrand it, ship it.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Tether** for the WDK and the bounty that funded this template.
 - **Trustwallet** for the open chain-logo asset library this template renders.
-- **Anthropic** for the [Model Context Protocol](https://modelcontextprotocol.io) spec that makes the AI-agent integration so clean.
+- The **Model Context Protocol** community for the open standard that makes the AI-agent integration vendor-neutral.
