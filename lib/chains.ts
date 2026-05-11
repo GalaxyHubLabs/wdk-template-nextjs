@@ -49,10 +49,14 @@ export interface ChainConfig {
   nativeName: string;
   /** Decimals of the native asset. */
   nativeDecimals: number;
+  /** Logo URL — Trustwallet's `assets` repo is the de facto crypto-logo CDN. */
+  logo: string;
   /** Per-network configuration. */
   mainnet: NetworkSpec;
   testnet: NetworkSpec;
 }
+
+const TRUSTWALLET = "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains";
 
 const USDT_LOGO =
   "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg";
@@ -72,6 +76,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     nativeSymbol: "SOL",
     nativeName: "Solana",
     nativeDecimals: 9,
+    logo: `${TRUSTWALLET}/solana/info/logo.png`,
     mainnet: {
       rpcUrl: envOr(
         "NEXT_PUBLIC_SOLANA_RPC_MAINNET",
@@ -111,6 +116,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     nativeSymbol: "TRX",
     nativeName: "Tronix",
     nativeDecimals: 6,
+    logo: `${TRUSTWALLET}/tron/info/logo.png`,
     mainnet: {
       rpcUrl: envOr("NEXT_PUBLIC_TRON_RPC_MAINNET", "https://api.trongrid.io"),
       txExplorer: (sig) => `https://tronscan.org/#/transaction/${sig}`,
@@ -146,6 +152,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     nativeSymbol: "TON",
     nativeName: "Toncoin",
     nativeDecimals: 9,
+    logo: `${TRUSTWALLET}/ton/info/logo.png`,
     mainnet: {
       rpcUrl: envOr(
         "NEXT_PUBLIC_TON_RPC_MAINNET",
@@ -182,6 +189,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
     nativeSymbol: "ETH",
     nativeName: "Ether",
     nativeDecimals: 18,
+    logo: `${TRUSTWALLET}/ethereum/info/logo.png`,
     mainnet: {
       rpcUrl: envOr("NEXT_PUBLIC_EVM_RPC_MAINNET", "https://eth.llamarpc.com"),
       txExplorer: (sig) => `https://etherscan.io/tx/${sig}`,

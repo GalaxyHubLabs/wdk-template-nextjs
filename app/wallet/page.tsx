@@ -10,7 +10,9 @@ import {
   EyeOff,
   History,
   Lock,
+  Plus,
   RefreshCcw,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +27,13 @@ import {
   networkSpec,
 } from "@/lib/chains";
 import {
+  getCustomTokens,
+  removeCustomToken,
+  type CustomToken,
+} from "@/lib/custom-tokens";
+import {
   getNativeBalance,
+  getTokenBalance,
   getUsdtBalance,
   switchNetwork,
   type WalletHandle,
@@ -53,6 +61,18 @@ export default function WalletPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [switchingNetwork, setSwitchingNetwork] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [customTokens, setCustomTokens] = useState<CustomToken[]>([]);
+  const [customBalances, setCustomBalances] = useState<Record<string, bigint>>({});
+
+  // Re-read custom tokens from localStorage whenever the active chain changes
+  // (each chain has its own list). The "tokens" page navigates back here
+  // after persisting, so a focus listener picks up out-of-band changes too.
+  useEffect(() => {
+    setCustomTokens(getCustomTokens(activeChain));
+    const onFocus = () => setCustomTokens(getCustomTokens(activeChain));
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [activeChain]);
 
   useEffect(() => {
     if (!handle) {
@@ -80,11 +100,28 @@ export default function WalletPage() {
           usdts[chain] = usdt;
         }
         setAllBalances(natives, usdts);
+
+        // Custom tokens — only fetch for the active chain (cheaper than
+        // running every chain's full custom list every refresh).
+        const active = getCustomTokens(activeChain);
+        if (active.length > 0) {
+          const entries = await Promise.all(
+            active.map(async (token) => {
+              const bal = await getTokenBalance(h, activeChain, token.address).catch(
+                () => 0n,
+              );
+              return [token.address, bal] as const;
+            }),
+          );
+          setCustomBalances(Object.fromEntries(entries));
+        } else {
+          setCustomBalances({});
+        }
       } finally {
         setRefreshing(false);
       }
     },
-    [setAllBalances],
+    [activeChain, setAllBalances],
   );
 
   // Initial balance fetch when the wallet first loads.
@@ -326,74 +363,71 @@ export default function WalletPage() {
           </div>
         )}
 
-        {/* USDT card — only render when the active chain × network has USDT */}
-        {activeAccount && activeSpec.usdt && (
+        {/* Tokens card — canonical USDT (when configured) plus user-added tokens */}
+        {activeAccount && (
           <Card>
-            <CardDescription>Tokens</CardDescription>
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-zinc-100 px-3 py-3 dark:border-zinc-800">
-              <div className="flex items-center gap-3">
-                {activeSpec.usdt.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={activeSpec.usdt.logo}
-                    alt="USDT"
-                    className="h-9 w-9 rounded-full bg-zinc-100 object-contain p-1 dark:bg-zinc-900"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                    USDT
-                  </div>
-                )}
-                <div className="leading-tight">
-                  <p className="text-sm font-medium">USDT</p>
-                  <p className="text-xs text-zinc-500">
-                    Tether USD on {activeConfig.label}
-                  </p>
-                </div>
-              </div>
-              <p className="font-mono text-sm">
-                {balanceHidden
-                  ? "••••"
-                  : usdtBalance == null
-                    ? "—"
-                    : formatBalance(usdtBalance, activeSpec.usdt.decimals)}
-              </p>
-            </div>
-            <p className="mt-3 text-[11px] text-zinc-500">
-              SPL / jetton / TRC-20 / ERC-20 transfer flows ship next. Add more
-              tokens in{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
-                lib/chains.ts
-              </code>
-              .
-            </p>
-          </Card>
-        )}
-
-        {/* When no USDT is configured for this chain × network, show a
-            constructive hint instead of an empty section. */}
-        {activeAccount && !activeSpec.usdt && (
-          <Card>
-            <CardDescription>Tokens</CardDescription>
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              No USDT contract is registered for {activeConfig.label}{" "}
-              {NETWORK_LABEL[handle.network].toLowerCase()}. Switch to{" "}
-              <button
-                onClick={() => void handleNetworkChange(handle.network === "mainnet" ? "testnet" : "mainnet")}
-                className="underline underline-offset-2 hover:text-foreground"
+            <div className="flex items-center justify-between">
+              <CardDescription>Tokens</CardDescription>
+              <Link
+                href="/wallet/tokens/add"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 hover:text-foreground dark:text-zinc-400 dark:hover:bg-zinc-900"
+                aria-label="Add custom token"
               >
-                {handle.network === "mainnet" ? "Testnet" : "Mainnet"}
-              </button>
-              {handle.network === "mainnet"
-                ? " for a test deployment, or "
-                : " for the live USDT contract, or "}
-              point{" "}
-              <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
-                NEXT_PUBLIC_{activeConfig.id.toUpperCase()}_USDT_{handle.network.toUpperCase()}
-              </code>{" "}
-              at your own deployment.
-            </p>
+                <Plus size={14} /> Add token
+              </Link>
+            </div>
+
+            <ul className="mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
+              {/* Canonical USDT row, when this chain × network has it */}
+              {activeSpec.usdt && (
+                <TokenRow
+                  logo={activeSpec.usdt.logo}
+                  symbol="USDT"
+                  name={`Tether USD on ${activeConfig.label}`}
+                  balance={usdtBalance}
+                  decimals={activeSpec.usdt.decimals}
+                  hidden={balanceHidden}
+                />
+              )}
+              {/* User-added tokens */}
+              {customTokens.map((token) => (
+                <TokenRow
+                  key={token.address}
+                  logo={token.logo}
+                  symbol={token.symbol}
+                  name={token.name}
+                  balance={customBalances[token.address] ?? null}
+                  decimals={token.decimals}
+                  hidden={balanceHidden}
+                  onRemove={() => {
+                    removeCustomToken(activeChain, token.address);
+                    setCustomTokens(getCustomTokens(activeChain));
+                  }}
+                />
+              ))}
+            </ul>
+
+            {/* Empty / hint states */}
+            {!activeSpec.usdt && customTokens.length === 0 && (
+              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                No tokens registered for {activeConfig.label}{" "}
+                {NETWORK_LABEL[handle.network].toLowerCase()} yet. Switch to{" "}
+                <button
+                  onClick={() =>
+                    void handleNetworkChange(
+                      handle.network === "mainnet" ? "testnet" : "mainnet",
+                    )
+                  }
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {handle.network === "mainnet" ? "Testnet" : "Mainnet"}
+                </button>
+                {handle.network === "mainnet"
+                  ? " for a test deployment, or click "
+                  : " for the live USDT contract, or click "}
+                <strong>Add token</strong> to import any other contract.
+              </p>
+            )}
           </Card>
         )}
       </div>
@@ -401,11 +435,74 @@ export default function WalletPage() {
   );
 }
 
-function ChainBadge({ chain }: { chain: ChainId }) {
-  const c = CHAIN_CONFIGS[chain];
+function TokenRow({
+  logo,
+  symbol,
+  name,
+  balance,
+  decimals,
+  hidden,
+  onRemove,
+}: {
+  logo?: string;
+  symbol: string;
+  name: string;
+  balance: bigint | null;
+  decimals: number;
+  hidden: boolean;
+  onRemove?: () => void;
+}) {
   return (
-    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-      {c.shortLabel.slice(0, 3)}
-    </span>
+    <li className="group flex items-center justify-between gap-3 py-3">
+      <div className="flex items-center gap-3">
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo}
+            alt={symbol}
+            className="h-9 w-9 rounded-full bg-zinc-100 object-contain p-1 dark:bg-zinc-900"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+            {symbol.slice(0, 3).toUpperCase()}
+          </div>
+        )}
+        <div className="leading-tight">
+          <p className="text-sm font-medium">{symbol}</p>
+          <p className="text-xs text-zinc-500">{name}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <p className="font-mono text-sm">
+          {hidden ? "••••" : balance == null ? "—" : formatBalance(balance, decimals)}
+        </p>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${symbol}`}
+            className="rounded-md p-1.5 text-zinc-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/30"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ChainBadge({ chain, size = 24 }: { chain: ChainId; size?: number }) {
+  const c = CHAIN_CONFIGS[chain];
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={c.logo}
+      alt={c.label}
+      width={size}
+      height={size}
+      className="rounded-full bg-zinc-100 dark:bg-zinc-800"
+      loading="lazy"
+    />
   );
 }

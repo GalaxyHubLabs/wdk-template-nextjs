@@ -161,10 +161,19 @@ export async function getUsdtBalance(
 ): Promise<bigint> {
   const spec = networkSpec(chain, handle.network);
   if (!spec.usdt) return 0n;
+  return getTokenBalance(handle, chain, spec.usdt.address);
+}
+
+/** Fetch the balance of any token by mint / contract address on a chain. */
+export async function getTokenBalance(
+  handle: WalletHandle,
+  chain: ChainId,
+  tokenAddress: string,
+): Promise<bigint> {
   const account = handle.accounts[chain]?.account;
   if (!account?.getTokenBalance) return 0n;
   try {
-    return coerceBigInt(await account.getTokenBalance(spec.usdt.address));
+    return coerceBigInt(await account.getTokenBalance(tokenAddress));
   } catch {
     return 0n;
   }
