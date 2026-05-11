@@ -211,9 +211,27 @@ export default function Home() {
         <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
           <div className="grid gap-6 p-8 sm:grid-cols-2 sm:gap-10 sm:p-10">
             <div className="flex flex-col justify-center space-y-4">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
-                <Bot size={12} /> For AI agents
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
+                  <Bot size={12} /> For AI agents
+                </div>
+                {/* "Live" pill — the endpoint is real, not aspirational.
+                    Curl-tested in the commit that introduced /api/mcp. */}
+                <a
+                  href="/api/mcp"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                  title="Probe the MCP manifest"
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  Live · /api/mcp
+                </a>
               </div>
+
               <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
                 Drive this wallet from{" "}
                 <span className="text-brand">Claude</span> in five lines of
@@ -229,14 +247,37 @@ export default function Home() {
                 >
                   Model Context Protocol
                 </a>{" "}
-                server at{" "}
+                server. Every tool reads through the same{" "}
                 <code className="rounded bg-white px-1.5 py-0.5 text-[12px] dark:bg-zinc-950">
-                  /api/mcp
-                </code>
-                . Read balances, resolve <code>.eth</code> / <code>.sol</code>{" "}
-                names, list transactions across nine chains — from any
-                MCP-aware agent. Zero glue code, zero seed exposure.
+                  @tetherto/wdk
+                </code>{" "}
+                integration that powers the wallet UI — agents see the
+                exact same chain config, the exact same RPCs, the exact
+                same address resolution. Zero glue code. Zero seed
+                exposure.
               </p>
+
+              {/* The six tools the MCP server exposes. Compact chip strip
+                  so a reviewer sees scope at a glance without leaving
+                  the landing. */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "list_supported_chains",
+                  "validate_address",
+                  "resolve_name",
+                  "get_balance",
+                  "get_token_metadata",
+                  "get_recent_transactions",
+                ].map((tool) => (
+                  <span
+                    key={tool}
+                    className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 font-mono text-[10px] text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+                  >
+                    {tool}
+                  </span>
+                ))}
+              </div>
+
               <Link
                 href="/agents"
                 className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-all hover:opacity-90"
