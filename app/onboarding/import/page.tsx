@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { openWallet } from "@/lib/wdk-client";
 import { saveVault } from "@/lib/storage";
 import { resetAccounts } from "@/lib/accounts";
+import { resetWatchList } from "@/lib/watch-list";
 import { useWalletStore } from "@/store/wallet";
 
 type WordCount = 12 | 24;
@@ -108,6 +109,7 @@ export default function ImportWalletPage() {
     try {
       await saveVault(phrase, password);
       resetAccounts();
+      resetWatchList();
       const handle = await openWallet(phrase, activeNetwork);
       setHandle(handle);
       setStatus("ready");

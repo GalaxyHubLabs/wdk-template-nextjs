@@ -76,6 +76,10 @@ export default function AddAccountPage() {
     }
   }
 
+  function watchAddress() {
+    router.push("/settings/add-watch");
+  }
+
   const options: Option[] = [
     {
       id: "create",
@@ -101,7 +105,8 @@ export default function AddAccountPage() {
       description:
         "Track balances and history for an address without holding its keys. Read-only.",
       Icon: Eye,
-      status: "soon",
+      status: "ready",
+      onSelect: watchAddress,
     },
     {
       id: "ledger",
@@ -187,8 +192,8 @@ export default function AddAccountPage() {
         </ul>
 
         <p className="text-center text-xs text-zinc-500">
-          Hardware wallets, private-key import, and watch-only addresses ship in
-          a follow-up. The architecture is already prepared — see{" "}
+          Hardware wallets and private-key import ship in a follow-up. The
+          architecture is already prepared — see{" "}
           <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-900">
             app/settings/add-account
           </code>

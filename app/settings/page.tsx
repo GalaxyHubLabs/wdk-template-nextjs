@@ -32,6 +32,12 @@ import {
   type AccountEntry,
 } from "@/lib/accounts";
 import { CHAIN_CONFIGS, CHAIN_IDS, NETWORK_LABEL } from "@/lib/chains";
+import {
+  getWatchList,
+  removeWatchEntry,
+  resetWatchList,
+  type WatchEntry,
+} from "@/lib/watch-list";
 import { clearVault, hasVault, unlockVault } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { cn, truncate } from "@/lib/utils";
@@ -49,6 +55,7 @@ export default function SettingsPage() {
 
   const [theme, setTheme] = useTheme();
   const [accounts, setAccounts] = useState<AccountEntry[]>([]);
+  const [watchList, setWatchList] = useState<WatchEntry[]>([]);
   const [switching, setSwitching] = useState(false);
   const [renaming, setRenaming] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -71,6 +78,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setAccounts(getAccounts());
+    setWatchList(getWatchList());
   }, []);
 
   if (!handle) {
@@ -180,9 +188,23 @@ export default function SettingsPage() {
     reset();
     clearVault();
     resetAccounts();
+    resetWatchList();
     setShowWipeConfirm(false);
     toast.info("Wallet wiped from this device.");
     router.replace("/");
+  }
+
+  function removeWatched(entry: WatchEntry) {
+    if (
+      !window.confirm(
+        `Stop watching ${entry.label}? You can add it again any time.`,
+      )
+    ) {
+      return;
+    }
+    removeWatchEntry(entry.id);
+    setWatchList(getWatchList());
+    toast.info(`Stopped watching ${entry.label}.`);
   }
 
   const themes: { value: Theme; label: string; Icon: typeof Sun }[] = [
@@ -368,6 +390,79 @@ export default function SettingsPage() {
               );
             })}
           </ul>
+        </Card>
+
+        {/* Watched addresses (read-only) */}
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Watched addresses</CardTitle>
+              <CardDescription className="mt-1">
+                Read-only. Balances refresh from the public RPC; no keys are
+                ever held for these.
+              </CardDescription>
+            </div>
+            <Link
+              href="/settings/add-watch"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-zinc-100 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              <Plus size={14} /> Watch
+            </Link>
+          </div>
+
+          {watchList.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">
+              You aren&apos;t watching any addresses yet. Use{" "}
+              <strong>Watch</strong> to track any address without holding its
+              keys.
+            </p>
+          ) : (
+            <ul className="mt-4 divide-y divide-zinc-100 dark:divide-zinc-800">
+              {watchList.map((entry) => {
+                const c = CHAIN_CONFIGS[entry.chain];
+                return (
+                  <li
+                    key={entry.id}
+                    className="group flex items-center justify-between gap-3 py-3"
+                  >
+                    <Link
+                      href={`/watch/${entry.id}`}
+                      className="flex flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={c.logo}
+                          alt={c.label}
+                          className="h-9 w-9 rounded-full bg-zinc-100 dark:bg-zinc-800"
+                          loading="lazy"
+                        />
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-zinc-100 text-zinc-600 dark:border-zinc-950 dark:bg-zinc-900 dark:text-zinc-300">
+                          <Eye size={9} />
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <p className="truncate text-sm font-medium">
+                          {entry.label}
+                        </p>
+                        <p className="font-mono text-xs text-zinc-500">
+                          {truncate(entry.address, 6, 6)} · {c.label}
+                        </p>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => removeWatched(entry)}
+                      aria-label={`Stop watching ${entry.label}`}
+                      className="rounded-md p-1.5 text-zinc-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/30"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
 
         {/* Backup recovery phrase */}

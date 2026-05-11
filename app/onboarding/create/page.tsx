@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { openWallet } from "@/lib/wdk-client";
 import { saveVault } from "@/lib/storage";
 import { resetAccounts } from "@/lib/accounts";
+import { resetWatchList } from "@/lib/watch-list";
 import { useWalletStore } from "@/store/wallet";
 
 type Step = "password" | "reveal" | "confirm";
@@ -62,6 +63,7 @@ export default function CreateWalletPage() {
     try {
       await saveVault(seedPhrase, password);
       resetAccounts();
+      resetWatchList();
       const handle = await openWallet(seedPhrase, activeNetwork);
       setHandle(handle);
       setStatus("ready");

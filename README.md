@@ -19,6 +19,7 @@ A complete, opinionated starter that demonstrates the WDK integration patterns m
 - ✅ **Send native SOL** with real fee quoting and Solscan confirmation links
 - ✅ **Receive** screen with QR code, copy-to-clipboard, network warning
 - ✅ **Account view** with live balance from Solana RPC
+- ✅ **Watch any address** — read-only tracking for any address on any supported chain, with native + Tether token balances, USD totals, and explorer links. No keys held, no signing surface.
 - ✅ **Lock / wipe** flows that keep the seed phrase as the source of truth
 
 Built so a developer can clone this repo, plug in their own RPC keys, and have a deployable wallet UI in under five minutes.
@@ -145,8 +146,15 @@ app/
     page.tsx                 # Account + balance dashboard
     send/page.tsx            # Native SOL send (form -> review -> execute)
     receive/page.tsx         # QR + address + copy
+  settings/
+    page.tsx                 # Accounts, watched addresses, recovery phrase, danger zone
+    add-account/page.tsx     # Picker: create / import / watch / hardware / private key
+    add-watch/page.tsx       # Watch-only: pick chain + address + label
+  watch/[id]/page.tsx        # Read-only view for a watched address (no signing UI)
 lib/
   wdk-client.ts              # Thin WDK wrappers (the only seed-aware module)
+  watch-list.ts              # Watch-only address registry (localStorage)
+  watch-balances.ts          # Raw-RPC balance fetchers for arbitrary addresses
   storage.ts                 # WebCrypto vault
   networks.ts                # RPC endpoints per network
   utils.ts                   # cn, truncate, formatBalance
