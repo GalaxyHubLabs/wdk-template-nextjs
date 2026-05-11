@@ -292,26 +292,24 @@ export default function Home() {
                 <div className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
                   <Bot size={12} /> For AI agents
                 </div>
-                {/* "Live" pill — the endpoint is real, not aspirational.
-                    Curl-tested in the commit that introduced /api/mcp. */}
+                {/* Endpoint pill — neutral mono chip, clickable to probe
+                    the live MCP manifest. Replaces the previous "Live"
+                    indicator with a quieter affordance that doesn't read
+                    as generic AI-template chrome. */}
                 <a
                   href="/api/mcp"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                  className="inline-flex w-fit items-center rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-mono text-[11px] font-medium text-zinc-700 transition-colors hover:border-brand/40 hover:text-foreground dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
                   title="Probe the MCP manifest"
                 >
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                  Live · /api/mcp
+                  /api/mcp
                 </a>
               </div>
 
               <h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-                Your <span className="text-brand">WDK</span> wallet,
-                programmable from any AI agent.
+                Built on <span className="text-brand">Tether WDK</span>.
+                Programmable from any AI agent.
               </h2>
               <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                 The same{" "}
