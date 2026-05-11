@@ -290,6 +290,65 @@ export async function sendNative(
   return { signature, fee: coerceBigInt(result?.fee) };
 }
 
+/**
+ * Estimate the fee for transferring an arbitrary token (USDT, XAUt, or
+ * any token whose contract address the caller provides). All chains
+ * expose the same `quoteTransfer({ token, recipient, amount })` surface
+ * via WDK's IWalletAccountReadOnly contract — this helper unifies the
+ * call so the send UI doesn't need to branch per chain.
+ */
+export async function quoteTokenSend(
+  handle: WalletHandle,
+  chain: ChainId,
+  tokenAddress: string,
+  recipient: string,
+  amount: bigint,
+): Promise<SendQuote> {
+  const account = handle.accounts[chain]?.account;
+  if (!account?.quoteTransfer) return { fee: 0n };
+  try {
+    const result = (await account.quoteTransfer({
+      token: tokenAddress,
+      recipient,
+      amount,
+    })) as { fee?: unknown };
+    return { fee: coerceBigInt(result?.fee) };
+  } catch {
+    return { fee: 0n };
+  }
+}
+
+/**
+ * Transfer an arbitrary token. The WDK token-transfer surface is
+ * uniform across every chain we support (SPL on Solana, TRC-20 on
+ * TRON, jettons on TON, ERC-20 on every EVM): each WalletAccount
+ * exposes a `transfer({ token, recipient, amount })` method that
+ * returns a hash. Failures are wrapped in a descriptive Error so the
+ * send UI can surface them verbatim.
+ */
+export async function sendToken(
+  handle: WalletHandle,
+  chain: ChainId,
+  tokenAddress: string,
+  recipient: string,
+  amount: bigint,
+): Promise<SendResult> {
+  const account = handle.accounts[chain]?.account;
+  if (!account?.transfer) {
+    throw new Error(`Token transfers are not supported for ${chain} yet.`);
+  }
+  const result = (await account.transfer({
+    token: tokenAddress,
+    recipient,
+    amount,
+  })) as { hash?: string; fee?: unknown };
+  const signature = String(result?.hash ?? "");
+  if (!signature) {
+    throw new Error("Transfer succeeded but no signature returned.");
+  }
+  return { signature, fee: coerceBigInt(result?.fee) };
+}
+
 function coerceBigInt(v: unknown): bigint {
   if (typeof v === "bigint") return v;
   if (typeof v === "number") return BigInt(Math.floor(v));

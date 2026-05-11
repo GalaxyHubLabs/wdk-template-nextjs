@@ -311,20 +311,35 @@ function NineChainsVisual() {
   );
 }
 
-/** USDT (Tether) wordmark mock-up. Uses the same logo we surface on
- *  every token row so the card reads as "real Tether assets, not a
- *  stub". XAUt peeks behind it to hint at the gold pair. */
+/** USDT (Tether) mark using the same Trustwallet-hosted PNG we ship on
+ *  every token row, with the XAUt mark peeking behind it. This is the
+ *  real logo, not a wordmark mockup, so the card reads as "actual
+ *  Tether assets" the moment the eye lands on it. */
 function UsdtVisual() {
+  const usdt =
+    "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png";
+  const xaut =
+    "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x68749665FF8D2d112Fa859AA293F07A622782F38/logo.png";
   return (
     <div className="flex h-16 items-center gap-3">
       <div className="relative">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#26a17b] shadow-sm">
-          <span className="font-mono text-base font-bold text-white">₮</span>
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={usdt}
+            alt="Tether USD"
+            className="h-12 w-12 rounded-full"
+            loading="lazy"
+          />
         </span>
-        <span className="absolute -bottom-1 -right-1 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-amber-400 shadow-sm dark:border-zinc-950">
-          <span className="font-mono text-[10px] font-bold text-amber-950">
-            Au
-          </span>
+        <span className="absolute -bottom-1 -right-1 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-white shadow-sm dark:border-zinc-950">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={xaut}
+            alt="Tether Gold"
+            className="h-6 w-6 rounded-full"
+            loading="lazy"
+          />
         </span>
       </div>
       <div className="flex flex-col font-mono text-[11px] leading-tight text-zinc-500">

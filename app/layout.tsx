@@ -15,7 +15,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Resolve metadataBase from the deployment URL when Vercel injects one,
+// otherwise fall back to the production domain. This is what Next.js
+// uses to expand relative URLs in OG and Twitter card images.
+const metadataBase = new URL(
+  process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://wdk-template.dev"),
+);
+
 export const metadata: Metadata = {
+  metadataBase,
   title: "WDK Template Wallet — Next.js",
   description:
     "Self-custodial multi-chain wallet template built on Tether WDK. Solana, TRON, TON, Ethereum, BSC, Polygon, Arbitrum, Base, and Optimism from a single seed. USDT-first. Production-ready scaffold for human users and AI agents.",
