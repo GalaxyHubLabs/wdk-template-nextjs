@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   BookUser,
+  ChevronDown,
   Check,
   Copy,
   Eye,
@@ -15,6 +16,8 @@ import {
   Moon,
   Pencil,
   Plus,
+  RotateCcw,
+  Server,
   ShieldAlert,
   Sun,
   Trash2,
@@ -32,7 +35,13 @@ import {
   resetAccounts,
   type AccountEntry,
 } from "@/lib/accounts";
-import { CHAIN_CONFIGS, CHAIN_IDS, NETWORK_LABEL } from "@/lib/chains";
+import { CHAIN_CONFIGS, CHAIN_IDS, NETWORK_LABEL, networkSpec } from "@/lib/chains";
+import {
+  clearAllOverrides,
+  clearRpcOverride,
+  getAllOverrides,
+  setRpcOverride,
+} from "@/lib/rpc-overrides";
 import {
   getWatchList,
   removeWatchEntry,
@@ -57,6 +66,9 @@ export default function SettingsPage() {
   const [theme, setTheme] = useTheme();
   const [accounts, setAccounts] = useState<AccountEntry[]>([]);
   const [watchList, setWatchList] = useState<WatchEntry[]>([]);
+  const [rpcOverrides, setRpcOverrides] = useState<Record<string, string>>({});
+  const [rpcExpanded, setRpcExpanded] = useState<string | null>(null);
+  const [rpcDraft, setRpcDraft] = useState<Record<string, string>>({});
   const [switching, setSwitching] = useState(false);
   const [renaming, setRenaming] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -80,6 +92,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setAccounts(getAccounts());
     setWatchList(getWatchList());
+    setRpcOverrides(getAllOverrides() as Record<string, string>);
   }, []);
 
   if (!handle) {
@@ -190,9 +203,38 @@ export default function SettingsPage() {
     clearVault();
     resetAccounts();
     resetWatchList();
+    clearAllOverrides();
     setShowWipeConfirm(false);
     toast.info("Wallet wiped from this device.");
     router.replace("/");
+  }
+
+  function saveRpcOverride(chain: string, network: string) {
+    const key = `${chain}:${network}`;
+    const next = (rpcDraft[key] ?? "").trim();
+    setRpcOverride(
+      chain as (typeof CHAIN_IDS)[number],
+      network as "mainnet" | "testnet",
+      next,
+    );
+    setRpcOverrides(getAllOverrides() as Record<string, string>);
+    toast.success(
+      next ? "RPC override saved. Re-open the wallet to apply." : "Override cleared.",
+    );
+  }
+
+  function resetRpcOverride(chain: string, network: string) {
+    clearRpcOverride(
+      chain as (typeof CHAIN_IDS)[number],
+      network as "mainnet" | "testnet",
+    );
+    setRpcOverrides(getAllOverrides() as Record<string, string>);
+    setRpcDraft((d) => {
+      const next = { ...d };
+      delete next[`${chain}:${network}`];
+      return next;
+    });
+    toast.info("Restored default RPC.");
   }
 
   function removeWatched(entry: WatchEntry) {
@@ -598,41 +640,127 @@ export default function SettingsPage() {
           </div>
         </Link>
 
-        {/* Networks summary */}
+        {/* Networks + custom RPC editor */}
         <Card>
-          <CardTitle>Networks</CardTitle>
-          <CardDescription className="mt-1 mb-4">
-            Currently bound to{" "}
-            <span className="font-medium text-foreground">
-              {NETWORK_LABEL[handle.network]}
-            </span>{" "}
-            for every chain. Switch from the wallet dashboard.
-          </CardDescription>
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Networks &amp; RPCs</CardTitle>
+              <CardDescription className="mt-1">
+                Currently bound to{" "}
+                <span className="font-medium text-foreground">
+                  {NETWORK_LABEL[handle.network]}
+                </span>
+                . Tap a chain to override its RPC URL for production-grade
+                providers (Helius, Alchemy, QuickNode, …). Changes take effect
+                on the next wallet open.
+              </CardDescription>
+            </div>
+            <Server size={18} className="shrink-0 text-zinc-400" />
+          </div>
+
+          <ul className="mt-4 divide-y divide-zinc-100 dark:divide-zinc-800">
             {CHAIN_IDS.map((chain) => {
               const c = CHAIN_CONFIGS[chain];
               const hasAcc = Boolean(handle.accounts[chain]);
+              const isOpen = rpcExpanded === chain;
+              const mainnetKey = `${chain}:mainnet`;
+              const testnetKey = `${chain}:testnet`;
+              const mainnetOverride = rpcOverrides[mainnetKey];
+              const testnetOverride = rpcOverrides[testnetKey];
+              const customCount =
+                (mainnetOverride ? 1 : 0) + (testnetOverride ? 1 : 0);
               return (
-                <li key={chain} className="flex items-center justify-between py-2">
-                  <div className="flex items-center gap-2.5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={c.logo}
-                      alt={c.label}
-                      className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800"
-                    />
-                    <span className="text-sm">{c.label}</span>
-                  </div>
-                  <span
-                    className={cn(
-                      "text-xs",
-                      hasAcc
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-zinc-400",
-                    )}
+                <li key={chain} className="py-2">
+                  <button
+                    type="button"
+                    onClick={() => setRpcExpanded(isOpen ? null : chain)}
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-1 py-1.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
                   >
-                    {hasAcc ? "Connected" : "Unavailable"}
-                  </span>
+                    <div className="flex items-center gap-2.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={c.logo}
+                        alt={c.label}
+                        className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800"
+                      />
+                      <span className="text-sm">{c.label}</span>
+                      {customCount > 0 && (
+                        <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand">
+                          {customCount} custom
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "text-xs",
+                          hasAcc
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-zinc-400",
+                        )}
+                      >
+                        {hasAcc ? "Connected" : "Unavailable"}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className={cn(
+                          "text-zinc-400 transition-transform",
+                          isOpen && "rotate-180",
+                        )}
+                      />
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="mt-2 space-y-3 rounded-lg border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+                      {(["mainnet", "testnet"] as const).map((net) => {
+                        const key = `${chain}:${net}`;
+                        const override = rpcOverrides[key];
+                        const draft = rpcDraft[key];
+                        const defaultUrl = networkSpec(chain, net).rpcUrl;
+                        const effectiveValue =
+                          draft != null ? draft : (override ?? "");
+                        return (
+                          <div key={net} className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium uppercase tracking-wider text-zinc-500">
+                                {NETWORK_LABEL[net]}
+                              </span>
+                              {override && (
+                                <button
+                                  type="button"
+                                  onClick={() => resetRpcOverride(chain, net)}
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-zinc-500 hover:bg-white hover:text-foreground dark:hover:bg-zinc-950"
+                                >
+                                  <RotateCcw size={11} /> Reset
+                                </button>
+                              )}
+                            </div>
+                            <Input
+                              value={effectiveValue}
+                              onChange={(e) =>
+                                setRpcDraft((d) => ({
+                                  ...d,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                              onBlur={() => {
+                                if (draft != null) saveRpcOverride(chain, net);
+                              }}
+                              placeholder={defaultUrl}
+                              spellCheck={false}
+                              autoCapitalize="off"
+                              className="font-mono text-xs"
+                            />
+                            <p className="break-all text-[10px] text-zinc-500">
+                              Default:{" "}
+                              <span className="font-mono">{defaultUrl}</span>
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -532,7 +532,27 @@ export const NETWORK_LABEL: Record<NetworkKey, string> = {
 };
 
 export function networkSpec(chain: ChainId, network: NetworkKey): NetworkSpec {
-  return CHAIN_CONFIGS[chain][network];
+  const base = CHAIN_CONFIGS[chain][network];
+  // Consult the user-set override layer. Defined inline rather than via
+  // top-level import to avoid a hard cycle if `rpc-overrides.ts` is ever
+  // expanded with logic that imports from this module.
+  const override = readRpcOverride(chain, network);
+  return override ? { ...base, rpcUrl: override } : base;
+}
+
+/** Locally inlined to avoid a circular import. Mirrors
+ *  `lib/rpc-overrides.ts::getRpcOverride` exactly. */
+function readRpcOverride(chain: ChainId, network: NetworkKey): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("wdk-template:rpc-overrides");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    const v = parsed?.[`${chain}:${network}`];
+    return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Placeholder for chains we plan to add when the corresponding WDK

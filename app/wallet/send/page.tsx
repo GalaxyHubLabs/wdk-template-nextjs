@@ -17,6 +17,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getAddressBook, type AddressEntry } from "@/lib/address-book";
 import { CHAIN_CONFIGS, NETWORK_LABEL, networkSpec } from "@/lib/chains";
+import { looksLikeName, resolveName } from "@/lib/name-resolution";
 import { hasVault } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { cn, formatBalance, truncate } from "@/lib/utils";
@@ -60,11 +61,50 @@ export default function SendPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [bookEntries, setBookEntries] = useState<AddressEntry[]>([]);
+  /** ENS / SNS resolution state. `resolvedAddress` is null both before
+   *  the user types a name and after a name fails to resolve. */
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [resolveFailed, setResolveFailed] = useState(false);
 
   // Load the active chain's saved addresses for the recipient picker.
   useEffect(() => {
     setBookEntries(getAddressBook(activeChain));
   }, [activeChain]);
+
+  // Name resolution. Fires whenever the recipient field looks like a
+  // `.eth` / `.sol` name and the active chain supports it. Cancels in-
+  // flight resolutions when the input changes again so we always show
+  // the answer for what's currently typed.
+  useEffect(() => {
+    if (!handle) return;
+    const trimmed = recipient.trim();
+    if (!looksLikeName(trimmed)) {
+      setResolvedAddress(null);
+      setResolving(false);
+      setResolveFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setResolving(true);
+    setResolveFailed(false);
+    // Small debounce so typing one character at a time doesn't fire
+    // an RPC per keystroke.
+    const timer = setTimeout(async () => {
+      try {
+        const addr = await resolveName(activeChain, trimmed, handle.network);
+        if (cancelled) return;
+        setResolvedAddress(addr);
+        setResolveFailed(addr == null);
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [recipient, activeChain, handle]);
 
   useEffect(() => {
     if (!handle) {
@@ -96,8 +136,15 @@ export default function SendPage() {
     amountUnits != null && quote != null ? amountUnits + quote.fee : null;
   const insufficientFunds = totalIfSending != null && totalIfSending > balance;
 
+  /** The address we'll actually send to: either the resolved name target
+   *  or the typed value if it's already a literal address. */
+  const effectiveRecipient =
+    resolvedAddress ?? (recipient.trim() || "");
+  const recipientIsValid = isLikelyAddressFor(activeChain, effectiveRecipient);
+
   const canReview =
-    isLikelyAddressFor(activeChain, recipient) &&
+    recipientIsValid &&
+    !resolving &&
     amountUnits != null &&
     amountUnits > 0n &&
     amountUnits <= balance;
@@ -118,7 +165,7 @@ export default function SendPage() {
       const q = await quoteNativeSend(
         handle,
         activeChain,
-        recipient.trim(),
+        effectiveRecipient,
         amountUnits,
       );
       setQuote(q);
@@ -139,7 +186,7 @@ export default function SendPage() {
       const result = await sendNative(
         handle,
         activeChain,
-        recipient.trim(),
+        effectiveRecipient,
         amountUnits,
       );
       setSignature(result.signature);
@@ -206,15 +253,43 @@ export default function SendPage() {
                   id="recipient"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder={`${config.label} address`}
+                  placeholder={
+                    activeChain === "solana"
+                      ? `${config.label} address or .sol name`
+                      : activeChain === "evm" ||
+                          activeChain === "bsc" ||
+                          activeChain === "polygon" ||
+                          activeChain === "arbitrum" ||
+                          activeChain === "base" ||
+                          activeChain === "optimism"
+                        ? `${config.label} address or .eth name`
+                        : `${config.label} address`
+                  }
                   autoComplete="off"
                   spellCheck={false}
+                  className="font-mono"
                 />
-                {recipient && !isLikelyAddressFor(activeChain, recipient) && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Doesn&apos;t look like a {config.label} address.
+                {resolving && (
+                  <p className="text-xs text-zinc-500">Resolving name…</p>
+                )}
+                {!resolving && resolvedAddress && (
+                  <p className="break-all text-xs text-emerald-600 dark:text-emerald-400">
+                    → {truncate(resolvedAddress, 8, 8)}
                   </p>
                 )}
+                {!resolving && resolveFailed && (
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    Couldn&apos;t resolve that name on this chain.
+                  </p>
+                )}
+                {!resolving &&
+                  !looksLikeName(recipient) &&
+                  recipient &&
+                  !isLikelyAddressFor(activeChain, recipient) && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Doesn&apos;t look like a {config.label} address.
+                    </p>
+                  )}
                 {bookEntries.length > 0 && (
                   <div className="mt-2 space-y-1">
                     <p className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-zinc-500">
@@ -294,7 +369,18 @@ export default function SendPage() {
               />
               <Row
                 label="To"
-                value={<span className="font-mono">{truncate(recipient.trim(), 8, 8)}</span>}
+                value={
+                  <div className="flex flex-col items-end leading-tight">
+                    {resolvedAddress && (
+                      <span className="text-xs text-zinc-500">
+                        {recipient.trim().toLowerCase()}
+                      </span>
+                    )}
+                    <span className="font-mono">
+                      {truncate(effectiveRecipient, 8, 8)}
+                    </span>
+                  </div>
+                }
               />
               <Row
                 label="Amount"
