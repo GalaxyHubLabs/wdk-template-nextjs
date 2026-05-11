@@ -43,15 +43,19 @@ export interface AccountHandle {
 }
 
 export interface WalletHandle {
-  /** Master secret. Kept in-memory so network switches don't force a
-   *  password re-entry. Wiped by closeWallet(). */
+  /** Master secret. Kept in-memory so network/account switches don't
+   *  force a password re-entry. Wiped by closeWallet(). */
   seedPhrase: string;
   /** WDK orchestrator — keep alive until logout, then `dispose()`. */
   wdk: WdkManager;
-  /** Derived account #0 per chain. */
+  /** Currently active account per chain (derived from `accountIndex`). */
   accounts: Record<ChainId, AccountHandle>;
   /** Network the whole wallet is currently bound to. */
   network: NetworkKey;
+  /** BIP-44 account index used to derive the current accounts. Same index
+   *  applies to every registered chain — matches how Phantom / MetaMask
+   *  treat "Account 1 / Account 2" across networks. */
+  accountIndex: number;
 }
 
 /**
@@ -64,6 +68,7 @@ export interface WalletHandle {
 export async function openWallet(
   seedPhrase: string,
   network: NetworkKey,
+  accountIndex: number = 0,
 ): Promise<WalletHandle> {
   // Lazy-import everything in parallel so the SSR bundle stays slim.
   const [
@@ -107,11 +112,22 @@ export async function openWallet(
     });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
+  const accounts = await deriveAllChains(wdk, accountIndex);
+  return { seedPhrase, wdk, accounts, network, accountIndex };
+}
+
+async function deriveAllChains(
+  wdk: WdkManager,
+  accountIndex: number,
+): Promise<Record<ChainId, AccountHandle>> {
   const accounts = {} as Record<ChainId, AccountHandle>;
   await Promise.all(
     CHAIN_IDS.map(async (chain) => {
       try {
-        const account = (await wdk.getAccount(chain, 0)) as unknown as ChainAccount;
+        const account = (await wdk.getAccount(
+          chain,
+          accountIndex,
+        )) as unknown as ChainAccount;
         const addrResult = await account.getAddress();
         const address = typeof addrResult === "string" ? addrResult : String(addrResult);
         accounts[chain] = { chain, address, account };
@@ -120,8 +136,21 @@ export async function openWallet(
       }
     }),
   );
+  return accounts;
+}
 
-  return { seedPhrase, wdk, accounts, network };
+/**
+ * Re-derive every chain's account at a new BIP-44 index, leaving the WDK
+ * orchestrator (and therefore the registered RPCs) intact. Cheaper than a
+ * full openWallet because we don't spin up a new WDK instance.
+ */
+export async function setAccountIndex(
+  handle: WalletHandle,
+  accountIndex: number,
+): Promise<WalletHandle> {
+  if (accountIndex === handle.accountIndex) return handle;
+  const accounts = await deriveAllChains(handle.wdk, accountIndex);
+  return { ...handle, accounts, accountIndex };
 }
 
 /**

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  BookUser,
   CheckCircle2,
   ExternalLink,
   Send,
@@ -14,8 +15,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getAddressBook, type AddressEntry } from "@/lib/address-book";
 import { CHAIN_CONFIGS, NETWORK_LABEL, networkSpec } from "@/lib/chains";
 import { hasVault } from "@/lib/storage";
+import { toast } from "@/lib/toast";
 import { cn, formatBalance, truncate } from "@/lib/utils";
 import {
   isLikelyAddressFor,
@@ -56,6 +59,12 @@ export default function SendPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [bookEntries, setBookEntries] = useState<AddressEntry[]>([]);
+
+  // Load the active chain's saved addresses for the recipient picker.
+  useEffect(() => {
+    setBookEntries(getAddressBook(activeChain));
+  }, [activeChain]);
 
   useEffect(() => {
     if (!handle) {
@@ -183,9 +192,16 @@ export default function SendPage() {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="recipient">
-                  Recipient address
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium" htmlFor="recipient">
+                    Recipient address
+                  </label>
+                  {bookEntries.length > 0 && (
+                    <span className="text-[11px] text-zinc-500">
+                      {bookEntries.length} saved · pick below
+                    </span>
+                  )}
+                </div>
                 <Input
                   id="recipient"
                   value={recipient}
@@ -198,6 +214,28 @@ export default function SendPage() {
                   <p className="text-xs text-amber-600 dark:text-amber-400">
                     Doesn&apos;t look like a {config.label} address.
                   </p>
+                )}
+                {bookEntries.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-zinc-500">
+                      <BookUser size={11} /> Address book
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {bookEntries.slice(0, 6).map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => {
+                            setRecipient(entry.address);
+                            toast.info(`Loaded ${entry.name}'s address.`);
+                          }}
+                          className="rounded-full border border-zinc-200 px-2.5 py-1 text-xs hover:bg-zinc-50 hover:border-brand dark:border-zinc-800 dark:hover:bg-zinc-900"
+                        >
+                          {entry.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 

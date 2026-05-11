@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
+  BookUser,
   Copy,
+  Droplets,
   ExternalLink,
   Eye,
   EyeOff,
@@ -12,6 +14,7 @@ import {
   Lock,
   Plus,
   RefreshCcw,
+  Settings,
   Trash2,
 } from "lucide-react";
 
@@ -243,9 +246,27 @@ export default function WalletPage() {
               across {CHAIN_IDS.length} chains · {NETWORK_LABEL[handle.network]}
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={lock} aria-label="Lock wallet">
-            <Lock size={14} /> Lock
-          </Button>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/wallet/addresses"
+              className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+              aria-label="Address book"
+              title="Address book"
+            >
+              <BookUser size={16} />
+            </Link>
+            <Link
+              href="/settings"
+              className="rounded-md p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings size={16} />
+            </Link>
+            <Button variant="ghost" size="sm" onClick={lock} aria-label="Lock wallet">
+              <Lock size={14} /> Lock
+            </Button>
+          </div>
         </div>
 
         {/* Chain + network selectors */}
@@ -398,6 +419,33 @@ export default function WalletPage() {
             </CardDescription>
           </Card>
         )}
+
+        {/* Faucet hint — only shows when this is a testnet account with zero
+            native balance. Helps brand-new users actually use the wallet. */}
+        {activeAccount &&
+          handle.network === "testnet" &&
+          activeSpec.faucetUrl &&
+          (nativeBalance == null || nativeBalance === 0n) && (
+            <a
+              href={activeSpec.faucetUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-brand-soft px-4 py-3 transition-all hover:bg-brand-soft hover:brightness-95"
+            >
+              <div className="flex items-center gap-3">
+                <Droplets size={18} className="text-brand" />
+                <div className="leading-tight">
+                  <p className="text-sm font-medium text-foreground">
+                    Get test {activeConfig.nativeSymbol} from the faucet
+                  </p>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                    Free testnet funds — no real money required.
+                  </p>
+                </div>
+              </div>
+              <ExternalLink size={14} className="text-brand" />
+            </a>
+          )}
 
         {/* Primary actions */}
         {activeAccount && (

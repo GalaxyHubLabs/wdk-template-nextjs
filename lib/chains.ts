@@ -37,6 +37,8 @@ export interface NetworkSpec {
   txExplorer: (id: string) => string;
   addressExplorer: (id: string) => string;
   tetherTokens: TetherToken[];
+  /** Public faucet URL for this network (testnets only — null on mainnet). */
+  faucetUrl?: string;
 }
 
 export interface ChainConfig {
@@ -118,6 +120,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
       txExplorer: (sig) => `https://solscan.io/tx/${sig}?cluster=devnet`,
       addressExplorer: (addr) =>
         `https://solscan.io/account/${addr}?cluster=devnet`,
+      faucetUrl: "https://faucet.solana.com/",
       tetherTokens: envToken("NEXT_PUBLIC_SOLANA_USDT_TESTNET", {
         symbol: "USDT",
         decimals: 6,
@@ -168,6 +171,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
         `https://shasta.tronscan.org/#/transaction/${sig}`,
       addressExplorer: (addr) =>
         `https://shasta.tronscan.org/#/address/${addr}`,
+      faucetUrl: "https://shasta.tronex.io/",
       tetherTokens: envToken("NEXT_PUBLIC_TRON_USDT_TESTNET", {
         symbol: "USDT",
         decimals: 6,
@@ -211,6 +215,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
       ),
       txExplorer: (sig) => `https://testnet.tonviewer.com/transaction/${sig}`,
       addressExplorer: (addr) => `https://testnet.tonviewer.com/${addr}`,
+      faucetUrl: "https://t.me/testgiver_ton_bot",
       tetherTokens: envToken("NEXT_PUBLIC_TON_USDT_TESTNET", {
         symbol: "USDT",
         decimals: 6,
@@ -256,6 +261,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
       rpcUrl: envOr("NEXT_PUBLIC_EVM_RPC_TESTNET", "https://sepolia.drpc.org"),
       txExplorer: (sig) => `https://sepolia.etherscan.io/tx/${sig}`,
       addressExplorer: (addr) => `https://sepolia.etherscan.io/address/${addr}`,
+      faucetUrl: "https://www.alchemy.com/faucets/ethereum-sepolia",
       tetherTokens: envToken("NEXT_PUBLIC_EVM_USDT_TESTNET", {
         symbol: "USDT",
         decimals: 6,
@@ -299,6 +305,7 @@ export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
       ),
       txExplorer: (sig) => `https://testnet.bscscan.com/tx/${sig}`,
       addressExplorer: (addr) => `https://testnet.bscscan.com/address/${addr}`,
+      faucetUrl: "https://testnet.bnbchain.org/faucet-smart",
       tetherTokens: envToken("NEXT_PUBLIC_BSC_USDT_TESTNET", {
         symbol: "USDT",
         decimals: 18,

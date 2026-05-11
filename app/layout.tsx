@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 import { ThemeToggle, themeInitScript } from "@/components/theme";
+import { Toaster } from "@/components/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
           <ThemeToggle />
         </div>
         {children}
+        <Toaster />
       </body>
     </html>
   );
