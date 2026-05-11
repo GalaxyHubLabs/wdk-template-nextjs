@@ -29,18 +29,12 @@ const MAINNET_TOKENS: SplToken[] = [
     decimals: 6,
     logo: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg",
   },
-  {
-    mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    symbol: "USDC",
-    name: "USD Coin",
-    decimals: 6,
-    logo: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
-  },
 ];
 
 const DEVNET_TOKENS: SplToken[] = [
-  // Tether does not maintain an official USDT mint on devnet. To preview the
-  // USDT row locally, set `NEXT_PUBLIC_DEVNET_USDT_MINT` and reload.
+  // Tether does not maintain an official USDT mint on Solana devnet. To
+  // preview the USDT row against your own devnet deployment, set
+  // `NEXT_PUBLIC_DEVNET_USDT_MINT=<your-mint>` and reload.
   ...(process.env.NEXT_PUBLIC_DEVNET_USDT_MINT
     ? [
         {
@@ -51,15 +45,6 @@ const DEVNET_TOKENS: SplToken[] = [
         },
       ]
     : []),
-  // Circle's official USDC devnet mint — used here only because Tether has
-  // not published an official USDT devnet deployment.
-  {
-    mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
-    symbol: "USDC",
-    name: "USD Coin (devnet)",
-    decimals: 6,
-    logo: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
-  },
 ];
 
 export function getKnownTokens(network: NetworkId): SplToken[] {
