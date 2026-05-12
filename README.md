@@ -20,30 +20,32 @@ Once deployed, the wallet is also a runnable MCP server: any standards-compliant
 
 ## Screenshots
 
-<!--
-  Drop screenshots into docs/screenshots/ and reference them below.
-  Suggested captures (each at ~1400px wide for crisp inline rendering
-  on the GitHub README — GitHub down-samples larger images anyway):
+<p align="center">
+  <img src="docs/screenshots/landing.png" alt="Landing — One seed. Ten chains. USDT-first." width="900" />
+</p>
 
-    docs/screenshots/landing.png       Hero + GitHub badge + MCP strip
-    docs/screenshots/dashboard.png     Wallet dashboard on Ethereum with USDT row
-    docs/screenshots/swap.png          /wallet/swap mid-quote
-    docs/screenshots/bridge.png        /wallet/bridge with route picker open
-    docs/screenshots/agents.png        /agents walk-through with TS snippet
-    docs/screenshots/chain-picker.png  Chain dropdown with all ten chains
--->
-
-| Landing | Dashboard |
-| --- | --- |
-| ![Landing — One seed. Ten chains. USDT-first.](docs/screenshots/landing.png) | ![Wallet dashboard on Ethereum mainnet](docs/screenshots/dashboard.png) |
-
-| Swap (Velora) | Bridge (USDT0) |
-| --- | --- |
-| ![Token swap powered by Tether's WDK Velora protocol module](docs/screenshots/swap.png) | ![Cross-chain USDT bridge powered by Tether's WDK USDT0 protocol module](docs/screenshots/bridge.png) |
-
-| AI-agents walk-through | Ten-chain picker |
-| --- | --- |
-| ![Built-in MCP server at /api/mcp with TypeScript + curl + Claude Desktop integration paths](docs/screenshots/agents.png) | ![Chain selector — Solana, TRON, TON, Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Bitcoin](docs/screenshots/chain-picker.png) |
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/agents.png" alt="MCP strip — Built on Tether WDK. Programmable from any AI agent. TypeScript / curl / Claude Desktop integration paths." />
+      <p align="center"><em>AI-agents strip on the landing page — tabbed snippet showing direct <code>@tetherto/wdk</code> usage, plus curl and Claude Desktop config paths against the live <code>/api/mcp</code> server.</em></p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/dashboard.png" alt="Wallet dashboard on Ethereum mainnet, primary actions row (Send / Receive / Swap / History) and the cross-chain USDT bridge entry." />
+      <p align="center"><em>Wallet dashboard on Ethereum mainnet — primary actions, deterministic address avatar, cross-chain bridge entry, recent activity card.</em></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/settings.png" alt="Settings — Appearance theme selector and Privacy & security card with biometric unlock and auto-lock presets." />
+      <p align="center"><em>Settings — three-state theme picker, biometric unlock (WebAuthn PRF), and auto-lock idle presets.</em></p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/swap.png" alt="Token swap page powered by Tether's WDK Velora protocol module. ETH → USDT on Ethereum mainnet." />
+      <p align="center"><em>Token swap powered by <code>@tetherto/wdk-protocol-swap-velora-evm</code> — Uniswap-style You-pay / You-receive fields with the WDK lineage spelled out below the form.</em></p>
+    </td>
+  </tr>
+</table>
 
 ---
 
