@@ -1,9 +1,10 @@
 import { ImageResponse } from "next/og";
 
 /**
- * Apple touch icon — same wordmark as `icon.tsx`, sized for iOS home
- * screen previews. Kept as a separate file so we can tune the visual
- * weight independently if the standard favicon proves too small.
+ * Apple touch icon — same wallet glyph as `icon.tsx`, sized for iOS
+ * home screen previews. Kept as a separate file so we can tune the
+ * visual weight independently if the standard favicon proves too
+ * small at the smallest browser-tab size.
  */
 
 export const size = {
@@ -24,16 +25,23 @@ export default function AppleIcon() {
           alignItems: "center",
           justifyContent: "center",
           background:
-            "linear-gradient(135deg, #0f3a3a 0%, #0a1f1f 65%, #050d0d 100%)",
-          color: "#1FBFA8",
-          fontSize: 120,
-          fontWeight: 800,
-          letterSpacing: -6,
-          fontFamily: "system-ui, sans-serif",
+            "linear-gradient(135deg, #1FBFA8 0%, #009393 60%, #006666 100%)",
           borderRadius: 40,
         }}
       >
-        W
+        <svg
+          width="112"
+          height="112"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2" />
+          <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 1 1-1v-4" />
+        </svg>
       </div>
     ),
     { ...size },

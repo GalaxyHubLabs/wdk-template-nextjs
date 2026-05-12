@@ -1,0 +1,12 @@
+Screenshots referenced from the root README live here. The README will
+render broken-image placeholders for any file that isn't present yet —
+GitHub still ships the rest of the README cleanly, so dropping captures
+in as they're taken is incremental.
+
+Suggested files (each ~1400px wide, PNG):
+  landing.png
+  dashboard.png
+  swap.png
+  bridge.png
+  agents.png
+  chain-picker.png

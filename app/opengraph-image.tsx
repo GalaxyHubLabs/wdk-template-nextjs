@@ -52,14 +52,22 @@ export default function OpengraphImage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 64,
-              fontWeight: 800,
-              letterSpacing: -3,
-              color: "#04201d",
               boxShadow: "0 10px 40px rgba(31, 191, 168, 0.35)",
             }}
           >
-            W
+            <svg
+              width="56"
+              height="56"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 1 1-1v-4" />
+            </svg>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span

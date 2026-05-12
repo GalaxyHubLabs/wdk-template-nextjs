@@ -18,6 +18,35 @@ Once deployed, the wallet is also a runnable MCP server: any standards-compliant
 
 ---
 
+## Screenshots
+
+<!--
+  Drop screenshots into docs/screenshots/ and reference them below.
+  Suggested captures (each at ~1400px wide for crisp inline rendering
+  on the GitHub README — GitHub down-samples larger images anyway):
+
+    docs/screenshots/landing.png       Hero + GitHub badge + MCP strip
+    docs/screenshots/dashboard.png     Wallet dashboard on Ethereum with USDT row
+    docs/screenshots/swap.png          /wallet/swap mid-quote
+    docs/screenshots/bridge.png        /wallet/bridge with route picker open
+    docs/screenshots/agents.png        /agents walk-through with TS snippet
+    docs/screenshots/chain-picker.png  Chain dropdown with all ten chains
+-->
+
+| Landing | Dashboard |
+| --- | --- |
+| ![Landing — One seed. Ten chains. USDT-first.](docs/screenshots/landing.png) | ![Wallet dashboard on Ethereum mainnet](docs/screenshots/dashboard.png) |
+
+| Swap (Velora) | Bridge (USDT0) |
+| --- | --- |
+| ![Token swap powered by Tether's WDK Velora protocol module](docs/screenshots/swap.png) | ![Cross-chain USDT bridge powered by Tether's WDK USDT0 protocol module](docs/screenshots/bridge.png) |
+
+| AI-agents walk-through | Ten-chain picker |
+| --- | --- |
+| ![Built-in MCP server at /api/mcp with TypeScript + curl + Claude Desktop integration paths](docs/screenshots/agents.png) | ![Chain selector — Solana, TRON, TON, Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Bitcoin](docs/screenshots/chain-picker.png) |
+
+---
+
 ## What ships
 
 A complete, opinionated wallet that demonstrates how far the WDK gets you without writing chain-specific code.
